@@ -2,8 +2,8 @@ import { serial, pgTable, varchar, text, integer, timestamp, index, uuid } from 
 import { users } from "./users";
 
 export const projects = pgTable("projects", {
-    id: uuid("id").primaryKey(),
-    title: varchar("name", {length: 255}).notNull(),
+    id: uuid("id").defaultRandom().primaryKey(),
+    title: varchar("title", {length: 255}).notNull(),
     description: text("description"),
     createdBy: uuid("created_by").references(()=>users.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),

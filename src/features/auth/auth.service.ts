@@ -13,7 +13,7 @@ type Register = {
     lastName: string;
     email: string;
     password: string;
-    role: "admin" | "user";
+    systemRole: "admin" | "user" | "super_admin";
 }
 
 type Login = {
@@ -23,7 +23,7 @@ type Login = {
 
 class AuthService{
     async registration(options: Register){
-        const {firstName, lastName, email, password, role} = options;
+        const {firstName, lastName, email, password, systemRole} = options;
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const result = await db.insert(users).values({
@@ -31,7 +31,7 @@ class AuthService{
             lastName,
             email,
             password: hashedPassword,
-            systemRole: role
+            systemRole: systemRole
         }).returning({
             id: users.id,
             email: users.email,
@@ -85,7 +85,7 @@ class AuthService{
         const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, {expiresIn: process.env.JWT_EXPIRY!} as SignOptions);
 
         return {
-            accessToken, unHashedToken
+            accessToken, unHashedToken, user: payload
         }
 
     }

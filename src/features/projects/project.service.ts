@@ -1,144 +1,239 @@
-// import { eq, isNull, and, sql } from "drizzle-orm";
-// import { db } from "../../db";
-// import { projectMembers } from "../../db/schema";
-// import {  projects } from "../../db/schema/projects";
-// import { ApiError } from "../../utils/ApiError";
+import { eq, isNull, and, sql } from "drizzle-orm";
+import { db } from "../../db";
+import { projectUsers, roles } from "../../db/schema";
+import {  projects } from "../../db/schema/projects";
+import { ApiError } from "../../utils/ApiError";
 
-// type CreateProjectInput = {
-//     name: string;
-//     description: string;
-//     createdBy: number
-// }
-// class ProjectService{
 
-//     async createProject(options: CreateProjectInput){
-       
-//     return await db.transaction(async (tx)=> {
-//         const [project] = await tx
-//             .insert(projects).values({
-//                 name: options.name,
-//                 description: options.description,
-//                 createdBy: options.createdBy
-//             }).returning()
+class ProjectService{
 
-//         await tx.insert(projectMembers).values({
-//             projectId: project.id,
-//             userId: options.createdBy,
-//             role: "project_admin"
-//         });
-//         return project;
-//     })
+    async createProject(options: {
+  title: string;
+  description?: string;
+  createdBy: string;
+}) {
+  return await db.transaction(async (tx) => {
 
-//     }
+    const [project] = await tx
+      .insert(projects)
+      .values({
+        title: options.title,
+        description: options.description ?? null,
+        createdBy: options.createdBy,
+      })
+      .returning();
 
-//     async listProjects(userId: number, role: string){
-//         if(role === "admin"){
-//             return await db
-//                 .select({
-//                     id: projects.id,
-//                     name: projects.name,
-//                     description: projects.description,
-//                     memberCount: sql<number>`count(${projectMembers.id})`
-//                 })
-//                 .from(projects)
-//                 .leftJoin(
-//                     projectMembers,
-//                     eq(projects.id, projectMembers.projectId)
-//                 )
-//                 .where(isNull(projects.deletedAt))
-//                 .groupBy(projects.id);
-//         }
-//         return await db
-//             .select({
-//                 id: projects.id,
-//                 name: projects.name,
-//                 description: projects.description,
-//                 memberCount: sql<number>`count(${projectMembers.id})`
-//             })
-//             .from(projects)
-//             .innerJoin(
-//                 projectMembers,
-//                 eq(projects.id, projectMembers.projectId)
-//             )
-//             .where(
-//                 and(
-//                     eq(projectMembers.userId, userId),
-//                     isNull(projects.deletedAt)
-//                 )
-//             )
-//             .groupBy(projects.id)
-//     }
+    const [role] = await tx.insert(roles).values({
+      name: "Project Admin",
+    }).returning();
 
-//     async getProjectDetails(
-//         projectId: number,
-//         userId: number,
-//         role: string
-//     ) {
-//     const result = await db
-//     .select({
-//       id: projects.id,
-//       name: projects.name,
-//       description: projects.description,
-//       createdAt: projects.createdAt,
-//     })
-//     .from(projects)
-//     .leftJoin(
-//       projectMembers,
-//       eq(projects.id, projectMembers.projectId)
-//     )
-//     .where(
-//       and(
-//         eq(projects.id, projectId),
-//         isNull(projects.deletedAt),
-//         role === "admin"
-//           ? undefined
-//           : eq(projectMembers.userId, userId)
-//       )
-//     );
+    await tx.insert(projectUsers).values({
+      projectId: project.id,
+      userId: options.createdBy,
+      roleId: role.id,
+      readAccess: true,
+      writeAccess: true,
+      updateAccess: true,
+      deleteAccess: true,
+    });
 
-//   const [project] = result;
+    return project;
+  });
 
-//   if (!project) {
-//     throw new ApiError(404, "Project not found or access denied");
-//   }
+}
 
-//   return project;
-//     }
 
-//     async updateProject(projectId: number, data: any){
-//         const [project] = await db.update(projects).set({
-//             name: data.name,
-//             description: data.description,
-//             updatedAt: new Date()
-//         }).where(
-//             and(
-//                 eq(projects.id, projectId),
-//                 isNull(projects.deletedAt)
-//             )
-//         ).returning();
+async assignUserToProject(options: {
+  projectId: string;
+  userId: string;
+  roleName: string;
+}) {
+  return await db.transaction(async (tx) => {
 
-//         if(!project){
-//             throw new ApiError(404, "Project not found")
-//         }
-//         return project;
-//     }
+    const [role] = await tx.insert(roles).values({
+      name: options.roleName,
+    }).returning();
 
-//     async deleteProject(projectId: number, userId: number){
-//         const result = await db.update(projects).set({
-//             deletedAt: new Date(),
-//             deletedBy: userId,
-//         }).where(
-//             and(
-//                 eq(projects.id, projectId),
-//                 isNull(projects.deletedAt)
-//             )
-//         ).returning()
+     if (!role) {
+      throw new ApiError(500, "Role creation failed");
+    }
 
-//         if(result.length === 0){
-//             throw new ApiError(404, "Porject not found")
-//         }
-//     }
+       const existing = await tx
+      .select()
+      .from(projectUsers)
+      .where(
+        and(
+          eq(projectUsers.projectId, options.projectId),
+          eq(projectUsers.userId, options.userId)
+        )
+      );
 
-// }
+    if (existing.length > 0) {
+      throw new ApiError(400, "User already assigned to this project");
+    }
 
-// export const projectService = new ProjectService();
+    await tx.insert(projectUsers).values({
+      projectId: options.projectId,
+      userId: options.userId,
+      roleId: role.id,
+      readAccess: true,
+      writeAccess: false,
+      updateAccess: false,
+      deleteAccess: false,
+    });
+
+    return true;
+
+  });
+}
+
+
+async listProjects(userId: string, systemRole: string) {
+  const isAdmin =
+    systemRole === "admin" || systemRole === "super_admin";
+
+  if (isAdmin) {
+    return await db
+      .select({
+        id: projects.id,
+        title: projects.title,
+        description: projects.description,
+      })
+      .from(projects)
+      .where(isNull(projects.deletedAt));
+  }
+
+  return await db
+    .select({
+      id: projects.id,
+      title: projects.title,
+      description: projects.description,
+    })
+    .from(projects)
+    .innerJoin(
+      projectUsers,
+      eq(projects.id, projectUsers.projectId)
+    )
+    .where(
+      and(
+        eq(projectUsers.userId, userId),
+        isNull(projects.deletedAt)
+      )
+    );
+}
+
+async getProjectDetails(
+  projectId: string,
+  userId: string,
+  systemRole: string
+) {
+  const isAdmin =
+    systemRole === "admin" || systemRole === "super_admin";
+
+  const conditions = [
+    eq(projects.id, projectId),
+    isNull(projects.deletedAt),
+  ];
+
+  if (!isAdmin) {
+    conditions.push(eq(projectUsers.userId, userId));
+  }
+
+  const result = await db
+    .select()
+    .from(projects)
+    .leftJoin(
+      projectUsers,
+      eq(projects.id, projectUsers.projectId)
+    )
+    .where(and(...conditions));
+
+  const [project] = result;
+
+  if (!project) {
+    throw new ApiError(404, "Project not found or access denied");
+  }
+
+  return project;
+}
+
+async updateProject(
+  projectId: string,
+  data: { title?: string; description?: string }
+) {
+  const [project] = await db
+    .update(projects)
+    .set({
+      title: data.title,
+      description: data.description,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(projects.id, projectId),
+        isNull(projects.deletedAt)
+      )
+    )
+    .returning();
+
+  if (!project) {
+    throw new ApiError(404, "Project not found");
+  }
+
+  return project;
+}
+
+async deleteProject(projectId: string, userId: string) {
+  const result = await db
+    .update(projects)
+    .set({
+      deletedAt: new Date(),
+      deletedBy: userId,
+    })
+    .where(
+      and(
+        eq(projects.id, projectId),
+        isNull(projects.deletedAt)
+      )
+    )
+    .returning();
+
+  if (result.length === 0) {
+    throw new ApiError(404, "Project not found");
+  }
+
+  return true;
+}
+
+async removeProjectMember(
+  projectId: string,
+  userId: string,
+  systemRole: string
+) {
+  const isAdmin =
+    systemRole === "admin" || systemRole === "super_admin";
+
+  if (!isAdmin) {
+    throw new ApiError(403, "Not allowed to remove members");
+  }
+
+  const result = await db
+    .delete(projectUsers)
+    .where(
+      and(
+        eq(projectUsers.projectId, projectId),
+        eq(projectUsers.userId, userId)
+      )
+    )
+    .returning();
+
+  if (result.length === 0) {
+    throw new ApiError(404, "Member not found");
+  }
+
+  return true;
+}
+}
+
+
+export const projectService = new ProjectService();

@@ -3,7 +3,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import { errorHandler } from "./middleware/errorHandler";
 import authRouter from "./features/auth/auth.routes";
-// import projectRouter from "./features/projects/project.routes"
+import projectRouter from "./features/projects/project.routes"
 import path from "path";
 
 const app = express();
@@ -29,7 +29,7 @@ app.get("/", (req, res)=>{
 })
 
 app.use("/api/v1/auth", authRouter);
-// app.use("/api/v1/project", projectRouter)
+app.use("/api/v1/project", projectRouter)
 
 app.use(errorHandler);
 

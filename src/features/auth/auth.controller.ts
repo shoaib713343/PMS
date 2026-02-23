@@ -4,9 +4,9 @@ import { ApiResponse } from "../../utils/ApiResponse";
 import { ApiError } from "../../utils/ApiError";
 
 export async function register(req: Request, res: Response) {
-    const {firstName, lastName, mobileNo, email, password, role} = req.body;
+    const {firstName, lastName, mobileNo, email, password, systemRole} = req.body;
     const options = {
-        firstName, lastName, mobileNo, email, password, role
+        firstName, lastName, mobileNo, email, password, systemRole
     }
     const user = await authService.registration(options);
 
@@ -20,7 +20,7 @@ export async function register(req: Request, res: Response) {
 }
 
 export async function login(req: Request, res: Response) {
-    const {accessToken, unHashedToken} = await authService.login(req.body);
+    const {accessToken, unHashedToken, user} = await authService.login(req.body);
    res.cookie("refreshToken", unHashedToken, {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
@@ -31,7 +31,7 @@ export async function login(req: Request, res: Response) {
         new ApiResponse(
             200,
             "Login Successfull",
-            {accessToken}
+            {accessToken, user}
 
         )
     )
