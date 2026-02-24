@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, text, timestamp, integer, index, uuid, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, timestamp, integer, index, uuid, boolean, uniqueIndex } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { projects } from "./projects";
 import { roles } from "./roles";
@@ -32,6 +32,6 @@ export const projectUsers = pgTable("project_users", {
     return {
         projectIdIdx: index("pm_project_id_idx").on(table.projectId),
         userIdIdx: index("pm_user_id_idx").on(table.userId),
-        uniqueMember: index("pm_unique_member_idx").on(table.projectId, table.userId)
+        uniqueMember: uniqueIndex("pm_unique_member_idx").on(table.projectId, table.userId)
     }
 })

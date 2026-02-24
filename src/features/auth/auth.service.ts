@@ -144,6 +144,18 @@ class AuthService{
 
         return {accessToken, newRawToken, newHashedToken}
     }
+
+    async listActiveUsers() {
+  return await db
+    .select({
+      id: users.id,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+    })
+    .from(users)
+    .where(eq(users.isDeleted, false));
+}
 }
 
 export const authService = new AuthService();

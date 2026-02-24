@@ -8,7 +8,8 @@ export async function createProjectController(req: Request, res: Response){
     const project = await projectService.createProject({
         title: req.body.title,
         description: req.body.description,
-        createdBy: req.user?.id || ""
+        createdBy: req.user?.id || "",
+        members: req.body.members,
     })
 
     return res.status(201).json(
@@ -19,9 +20,14 @@ export async function createProjectController(req: Request, res: Response){
 export const listProjectsController = async (req: Request, res: Response) => {
   const user = req.user!;
 
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
+
   const projects = await projectService.listProjects(
     user.id,
-    user.systemRole
+    user.systemRole,
+    page,
+    limit
   );
 
   res.status(200).json({
