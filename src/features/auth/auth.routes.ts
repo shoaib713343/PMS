@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listUsersController, login, refresh, register } from "./auth.controller";
+import { listUsersController, login, logout, refresh, register } from "./auth.controller";
 import { validate } from "../../middleware/validate";
 import { loginSchema, registerUserSchema } from "./auth.validation";
 import { asyncHandler } from "../../utils/asyncHandler";
@@ -16,6 +16,7 @@ router.get(
 );
 router.post("/register", validate(registerUserSchema),asyncHandler( register));
 router.post("/login", validate(loginSchema), asyncHandler(login));
-router.post("/refresh", asyncHandler(refresh));
+router.post("/refresh", protect, asyncHandler(refresh));
+router.post("/logout", protect, asyncHandler(logout));
 
 export default router;

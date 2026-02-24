@@ -37,6 +37,22 @@ export async function login(req: Request, res: Response) {
     )
 }
 
+export async function logout(req: Request, res: Response) {
+    const refreshToken =  req.cookies?.refreshToken;
+    if(!refreshToken){
+        return res.json(
+            new ApiResponse(200, "Logout Successfull")
+        )
+    }
+    await authService.logout(refreshToken);
+
+    res.clearCookie("refreshCookie", {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict"
+    })
+}
+
 export async function refresh(req: Request, res: Response) {
     const refreshToken = req.cookies.refreshToken;
     if(!refreshToken){

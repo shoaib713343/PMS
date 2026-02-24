@@ -145,6 +145,14 @@ class AuthService{
         return {accessToken, newRawToken, newHashedToken}
     }
 
+    async logout(refreshToken: string){
+        const hashedToken = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+        await db.delete(userSessions).where(eq(userSessions.refreshToken, hashedToken))
+
+
+    }
+
     async listActiveUsers() {
   return await db
     .select({
