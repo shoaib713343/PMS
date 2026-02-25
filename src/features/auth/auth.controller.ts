@@ -69,12 +69,3 @@ export async function refresh(req: Request, res: Response) {
         new ApiResponse(200, "Tokens refreshed" ,{accessToken})
     )
 }
-
-export const listUsersController = async (req: Request, res: Response) => {
-  const users = await authService.listActiveUsers();
-
-  res.status(200).json({
-    success: true,
-    data: users,
-  });
-};

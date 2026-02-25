@@ -3,7 +3,9 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import { errorHandler } from "./middleware/errorHandler";
 import authRouter from "./features/auth/auth.routes";
-import projectRouter from "./features/projects/project.routes"
+import projectRouter from "./features/projects/project.routes";
+import userRouter from "./features/users/user.routes";
+import rolesRouter from "./features/roles/role.routes";
 import path from "path";
 
 const app = express();
@@ -29,7 +31,9 @@ app.get("/", (req, res)=>{
 })
 
 app.use("/api/v1/auth", authRouter);
-app.use("/api/v1/project", projectRouter)
+app.use("/api/v1/users", userRouter);
+app.use("/api/v1/project", projectRouter);
+app.use("/api/v1/roles", rolesRouter);
 
 app.use(errorHandler);
 
