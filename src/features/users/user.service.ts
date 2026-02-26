@@ -45,7 +45,7 @@ class UserService{
             .where(eq(users.isDeleted, false));
         }
 
-    async getUserById(id: string) {
+    async getUserById(id: number) {
     const [user] = await db
       .select({
         id: users.id,
@@ -64,7 +64,7 @@ class UserService{
     return user;
   }
 
-  async updateUser(id: string, data: any) {
+  async updateUser(id: number, data: any) {
     const [updated] = await db
       .update(users)
       .set({
@@ -81,7 +81,7 @@ class UserService{
     return updated;
   }
 
-  async deleteUser(id: string) {
+  async deleteUser(id: number) {
     const result = await db
       .update(users)
       .set({

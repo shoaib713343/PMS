@@ -4,17 +4,17 @@ import { projects } from "./projects";
 import { roles } from "./roles";
 
 export const projectUsers = pgTable("project_users", {
-  id: uuid("id").defaultRandom().primaryKey(),
+  id: serial("id").primaryKey(),
 
-  projectId: uuid("project_id")
+  projectId: serial("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
 
-  userId: uuid("user_id")
+  userId: serial("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
 
-  roleId: uuid("role_id")
+  roleId: serial("role_id")
     .notNull()
     .references(() => roles.id),
 

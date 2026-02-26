@@ -8,8 +8,8 @@ class ProjectService {
   async createProject(options: {
   title: string;
   description?: string;
-  createdBy: string;
-  members?: { userId: string; roleName: string }[];
+  createdBy: number;
+  members?: { userId: number; roleName: string }[];
 }) {
   return await db.transaction(async (tx) => {
 
@@ -22,34 +22,11 @@ class ProjectService {
       })
       .returning();
 
-    const [adminRole] = await tx
-      .select()
-      .from(roles)
-      .where(eq(roles.name, "Project Admin"));
-
-    if (!adminRole) {
-      throw new ApiError(400, "Project Admin role not found");
-    }
-
-    await tx.insert(projectUsers).values({
-      projectId: project.id,
-      userId: options.createdBy,
-      roleId: adminRole.id,
-      readAccess: true,
-      writeAccess: true,
-      updateAccess: true,
-      deleteAccess: true,
-    });
-
     if (options.members?.length) {
 
-      const uniqueUserIds = new Set<string>();
+      const uniqueUserIds = new Set<number>();
 
       for (const member of options.members) {
-
-        if (member.userId === options.createdBy) {
-          throw new ApiError(400, "Creator cannot be added again");
-        }
 
         if (uniqueUserIds.has(member.userId)) {
           throw new ApiError(400, "Duplicate users in members list");
@@ -83,8 +60,8 @@ class ProjectService {
 }
 
   async assignUserToProject(options: {
-    projectId: string;
-    userId: string;
+    projectId: number;
+    userId: number;
     roleName: string;
   }) {
     return await db.transaction(async (tx) => {
@@ -129,7 +106,7 @@ class ProjectService {
 
 
 async listProjects(
-  userId: string,
+  userId: number,
   systemRole: string,
   page: number,
   limit: number
@@ -207,8 +184,8 @@ async listProjects(
 }
 
   async getProjectDetails(
-    projectId: string,
-    userId: string,
+    projectId: number,
+    userId: number,
     systemRole: string,
   ) {
     const isAdmin = systemRole === "admin" || systemRole === "super_admin";
@@ -235,7 +212,7 @@ async listProjects(
   }
 
   async updateProject(
-    projectId: string,
+    projectId: number,
     data: { title?: string; description?: string },
   ) {
     const [project] = await db
@@ -255,7 +232,7 @@ async listProjects(
     return project;
   }
 
-  async deleteProject(projectId: string, userId: string) {
+  async deleteProject(projectId: number, userId: number) {
     const result = await db
       .update(projects)
       .set({
@@ -273,8 +250,8 @@ async listProjects(
   }
 
   async removeProjectMember(
-    projectId: string,
-    userId: string,
+    projectId: number,
+    userId: number,
     systemRole: string,
   ) {
     const isAdmin = systemRole === "admin" || systemRole === "super_admin";

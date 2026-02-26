@@ -27,7 +27,7 @@ export async function listRolesController(req: Request, res: Response){
 }
 
 export async function listRoleByIdController(req: Request, res: Response){
-    const role = await roleService.rolesById(req.params.id.toString());
+    const role = await roleService.rolesById(Number(req.params.id));
 
     return res.status(200).json(
         new ApiResponse(
@@ -39,7 +39,7 @@ export async function listRoleByIdController(req: Request, res: Response){
 }
 
 export async function updateRoleController(req: Request, res: Response){
-    const role = await roleService.updateRole(req.params.id.toString(), req.body.name);
+    const role = await roleService.updateRole(Number(req.params.id), req.body.name);
 
     return res.status(200).json(
         new ApiResponse(200, "role updated successfully", role)
@@ -47,7 +47,7 @@ export async function updateRoleController(req: Request, res: Response){
 }
 
 export async function deleteRoleController(req: Request, res: Response){
-    await roleService.deleteRole(req.params.id.toString());
+    await roleService.deleteRole(Number(req.params.id.toString));
 
     return res.status(200).json(
         new ApiResponse(200, 

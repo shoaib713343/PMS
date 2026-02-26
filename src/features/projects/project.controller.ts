@@ -8,7 +8,7 @@ export async function createProjectController(req: Request, res: Response){
     const project = await projectService.createProject({
         title: req.body.title,
         description: req.body.description,
-        createdBy: req.user?.id || "",
+        createdBy: Number(req.user?.id),
         members: req.body.members,
     })
 
@@ -24,7 +24,7 @@ export const listProjectsController = async (req: Request, res: Response) => {
   const limit = Number(req.query.limit) || 10;
 
   const projects = await projectService.listProjects(
-    user.id,
+    Number(user.id),
     user.systemRole,
     page,
     limit
@@ -40,13 +40,13 @@ export const getProjectDetailsController = async (
   req: Request,
   res: Response
 ) => {
-  const  projectIdString  = req.params.projectId;
-  const projectId = projectIdString.toString();
+  
+  const projectId = Number(req.params.projectId);
   const user = req.user!;
 
   const project = await projectService.getProjectDetails(
     projectId,
-    user.id,
+    Number(user.id),
     user.systemRole
   );
 
@@ -63,7 +63,7 @@ export const updateProjectController = async (
   const  projectId  = req.params.projectId;
   const { title, description } = req.body;
 
-  const updated = await projectService.updateProject(projectId.toString(), {
+  const updated = await projectService.updateProject(Number(projectId), {
     title,
     description,
   });
@@ -81,7 +81,7 @@ export const deleteProjectController = async (
   const { projectId } = req.params;
   const user = req.user!;
 
-  await projectService.deleteProject(projectId.toString(), user.id);
+  await projectService.deleteProject(Number(projectId), Number(user.id));
 
   res.status(200).json({
     success: true,
@@ -93,7 +93,7 @@ export async function assignProjectMember(req: Request, res: Response){
     const  projectIdString  = req.params.projectId;
     const { userId, roleName } = req.body;
 
-    const projectId = projectIdString.toString();
+    const projectId = Number(projectIdString);
 
     const currentUser = req.user;
 
@@ -110,7 +110,7 @@ export async function assignProjectMember(req: Request, res: Response){
 
     await projectService.assignUserToProject({
       projectId,
-      userId,
+      userId: Number(userId),
       roleName,
     });
 
@@ -128,8 +128,8 @@ export const removeProjectMemberController = async (
   const currentUser = req.user!;
 
   await projectService.removeProjectMember(
-    projectId.toString(),
-    userId.toString(),
+    Number(projectId),
+    Number(userId),
     currentUser.systemRole
   );
 

@@ -10,12 +10,12 @@ export async function createUserController(req: Request, res: Response) {
     const user = await userService.createUser(options);
 
     return res.json(
-        new ApiResponse(201, "User Created Successfully")
+        new ApiResponse(201, "User Created Successfully", user)
     )
 }
 
 export const updateUserController = async (req: Request, res: Response) => {
-  const user = await userService.updateUser(req.params.id.toString(), req.body);
+  const user = await userService.updateUser(Number(req.params.id), req.body);
 
   res.status(200).json(
     new ApiResponse(
@@ -27,7 +27,7 @@ export const updateUserController = async (req: Request, res: Response) => {
 };
 
 export const getUserController = async (req: Request, res: Response) => {
-  const user = await userService.getUserById(req.params.id.toString());
+  const user = await userService.getUserById(Number(req.params.id));
 
   res.status(200).json(
     new ApiResponse(
@@ -51,7 +51,7 @@ export const listUsersController = async (_: Request, res: Response) => {
 };
 
 export const deleteUserController = async (req: Request, res: Response) => {
-    await userService.deleteUser(req.params.id.toString());
+    await userService.deleteUser(Number(req.params.id));
 
     res.status(200).json(
         new ApiResponse(

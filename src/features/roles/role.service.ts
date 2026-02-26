@@ -28,7 +28,7 @@ class RoleService{
         ).from(roles)
     }
 
-    async rolesById(id: string){
+    async rolesById(id: number){
         const [role] = await db.select({
             id: roles.id,
             name: roles.name
@@ -43,7 +43,7 @@ class RoleService{
         return role;
     }
 
-    async updateRole(id: string, data:{name: string}){
+    async updateRole(id: number, data:{name: string}){
         const [role] =  await db.update(roles).set({
             ...data
         }).where(eq(roles.id, id)).returning();
@@ -54,7 +54,7 @@ class RoleService{
         return role;
     }
 
-    async deleteRole(id: string){
+    async deleteRole(id: number){
         const result = await db.delete(roles).where(
             eq(roles.id, id)
         ).returning()

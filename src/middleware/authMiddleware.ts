@@ -30,7 +30,7 @@ async function protectLogic(req: Request, res: Response, next: NextFunction){
     if (!secret) {
     throw new ApiError(500, 'Internal server error: JWT secret is not configured');
   }
-  const decoded = jwt.verify(token, secret) as {id: string };
+  const decoded = jwt.verify(token, secret) as {id: number };
 
   if(!decoded.id){
     throw new ApiError(401, 'Unauthorized: Invalid token');

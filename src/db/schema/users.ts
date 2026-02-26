@@ -5,7 +5,8 @@ import {
   text,
   boolean,
   pgEnum,
-  timestamp
+  timestamp,
+  serial
 } from "drizzle-orm/pg-core";
 
 
@@ -16,8 +17,7 @@ export const systemRoleEnum = pgEnum("system_role", [
 ]);
 
 export const users = pgTable("users", {
-  id: uuid("id")
-    .defaultRandom()
+  id: serial("id")
     .primaryKey(),
 
   firstName: varchar("first_name", {length: 100}).notNull(),
