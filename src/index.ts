@@ -3,6 +3,14 @@ import app from "./app";
 
 const PORT = process.env.PORT! || 3000;
 
-app.listen(PORT, ()=>{
-    console.log(`Server is running on PORT ${PORT}`)
-})
+import { bootstrapSuperAdmin } from "./bootstrap";
+
+async function startServer() {
+  await bootstrapSuperAdmin();
+
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+startServer();
