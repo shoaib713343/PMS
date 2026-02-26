@@ -5,11 +5,11 @@ export const projects = pgTable("projects", {
     id: serial("id").primaryKey(),
     title: varchar("title", {length: 255}).notNull(),
     description: text("description"),
-    createdBy: serial("created_by").references(()=>users.id),
+    createdBy: integer("created_by").references(()=>users.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
     deletedAt: timestamp("deleted_at"),
-    deletedBy: serial("deleted_by").references(()=>users.id)
+    deletedBy: integer("deleted_by").references(()=>users.id)
 },(table)=>{
     return {
         createdByIdx: index("projects_created_by_idx").on(table.createdBy),

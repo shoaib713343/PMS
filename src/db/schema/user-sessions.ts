@@ -13,7 +13,7 @@ import { users } from "./users";
 export const userSessions = pgTable("user_sessions", {
   id: serial("id").primaryKey(),
 
-  userId: serial("user_id")
+  userId: integer("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
 

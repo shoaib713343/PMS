@@ -6,11 +6,11 @@ import { roles } from "./roles";
 export const projectUsers = pgTable("project_users", {
   id: serial("id").primaryKey(),
 
-  projectId: serial("project_id")
+  projectId: integer("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
 
-  userId: serial("user_id")
+  userId: integer("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
 
