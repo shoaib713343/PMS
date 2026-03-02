@@ -37,7 +37,7 @@ export function errorHandler(err:any, req: Request, res: Response, next: NextFun
         });
     }
 
-    if (err.code === "23503") {
+    if (err.code === "23505") {
     return res.status(400).json({
       success: false,
       message: "Invalid reference provided",
