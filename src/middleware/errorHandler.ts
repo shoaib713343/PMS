@@ -37,17 +37,9 @@ export function errorHandler(err:any, req: Request, res: Response, next: NextFun
     });
   }
 
-    if(err instanceof ApiError ){
-        return res.status(err.statusCode).json({
-            success: false,
-            message: err.message,
-            errors: err.errors,
-            data: null
-        });
-    }
-    console.error("An unexpected error occured:", err);
 
-    if(err.code === '23505'){
+
+    if(err.cause.code === '23505'){
         return res.status(400).json({
             success: false,
             message: "Duplicate entry",
@@ -56,7 +48,7 @@ export function errorHandler(err:any, req: Request, res: Response, next: NextFun
         });
     }
 
-    if (err.code === "23505") {
+    if (err.cause.code === "23503") {
     return res.status(400).json({
       success: false,
       message: "Invalid reference provided",
@@ -64,6 +56,16 @@ export function errorHandler(err:any, req: Request, res: Response, next: NextFun
       data: null,
     });
   }
+
+      if(err instanceof ApiError ){
+        return res.status(err.statusCode).json({
+            success: false,
+            message: err.message,
+            errors: err.errors,
+            data: null
+        });
+    }
+    console.error("An unexpected error occured:", err);
 
     return res.status(500).json({
         success: false,
