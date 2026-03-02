@@ -1,6 +1,7 @@
 import {Request, Response, NextFunction} from "express";
 import { ApiError } from "../utils/ApiError";
 import { ZodError } from "zod";
+import { TokenExpiredError, JsonWebTokenError } from "jsonwebtoken";
 
 export function errorHandler(err:any, req: Request, res: Response, next: NextFunction){
 
@@ -14,6 +15,24 @@ export function errorHandler(err:any, req: Request, res: Response, next: NextFun
       success: false,
       message: "Validation failed",
       errors: formattedErrors,
+      data: null,
+    });
+  }
+
+    if (err instanceof TokenExpiredError) {
+    return res.status(401).json({
+      success: false,
+      message: "Session expired. Please login again.",
+      errors: [],
+      data: null,
+    });
+  }
+
+    if (err instanceof JsonWebTokenError) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid authentication token.",
+      errors: [],
       data: null,
     });
   }
