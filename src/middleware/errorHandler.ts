@@ -39,7 +39,7 @@ export function errorHandler(err:any, req: Request, res: Response, next: NextFun
 
 
 
-    if(err.cause.code === '23505'){
+    if(err?.cause?.code === '23505'){
         return res.status(400).json({
             success: false,
             message: "Duplicate entry",
@@ -48,7 +48,7 @@ export function errorHandler(err:any, req: Request, res: Response, next: NextFun
         });
     }
 
-    if (err.cause.code === "23503") {
+    if (err?.cause?.code === "23503") {
     return res.status(400).json({
       success: false,
       message: "Invalid reference provided",
