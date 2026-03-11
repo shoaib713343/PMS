@@ -11,6 +11,8 @@ import path from "path";
 
 const app = express();
 
+app.use(express.json());
+
 app.use(
   cors({
     origin: [
@@ -21,7 +23,7 @@ app.use(
   })
 );
 
-app.use(express.json());
+
 app.use(cookieParser());
 app.use("/images", express.static(path.join(process.cwd(), "public/images")))
 
@@ -33,7 +35,7 @@ app.get("/", (req, res)=>{
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
-app.use("/api/v1/projects", projectRouter);
+app.use("/api/v1/project", projectRouter);
 app.use("/api/v1/roles", rolesRouter);
 
 app.use(errorHandler);
