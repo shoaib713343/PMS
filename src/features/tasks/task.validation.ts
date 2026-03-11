@@ -1,0 +1,28 @@
+import {z} from "zod";
+
+export const createtaskSchema = z.object({
+    param: z.object({
+        threadId: z.string(),
+        userId: z.string(),
+    }),
+    body: z.object({
+        title: z.string(),
+        description: z.string().optional(),
+        gitLink: z.string().optional(),
+        targetDate: z.string().optional(),
+    
+    })
+});
+
+export const updateTaskSchema = z.object({
+    param: z.object({
+        taskId: z.string(),
+        userId: z.string()
+    }),
+    body: z.object({
+        title: z.string(),
+        description: z.string().optional(),
+        gitLink: z.string().optional(),
+        targetDate: z.string().optional(),
+    })
+})

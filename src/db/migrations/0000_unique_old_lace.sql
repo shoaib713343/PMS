@@ -1,11 +1,11 @@
 CREATE TYPE "public"."system_role" AS ENUM('user', 'admin', 'super_admin');--> statement-breakpoint
 CREATE TABLE "roles" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" serial PRIMARY KEY NOT NULL,
 	"name" varchar(255) NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "users" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" serial PRIMARY KEY NOT NULL,
 	"first_name" varchar(100) NOT NULL,
 	"last_name" varchar(100) NOT NULL,
 	"email" varchar(255) NOT NULL,
@@ -19,21 +19,21 @@ CREATE TABLE "users" (
 );
 --> statement-breakpoint
 CREATE TABLE "projects" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" serial PRIMARY KEY NOT NULL,
 	"title" varchar(255) NOT NULL,
 	"description" text,
-	"created_by" uuid,
+	"created_by" integer,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	"deleted_at" timestamp,
-	"deleted_by" uuid
+	"deleted_by" integer
 );
 --> statement-breakpoint
 CREATE TABLE "project_users" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"project_id" uuid NOT NULL,
-	"user_id" uuid NOT NULL,
-	"role_id" uuid NOT NULL,
+	"id" serial PRIMARY KEY NOT NULL,
+	"project_id" integer NOT NULL,
+	"user_id" integer NOT NULL,
+	"role_id" integer NOT NULL,
 	"read_access" boolean DEFAULT false NOT NULL,
 	"write_access" boolean DEFAULT false NOT NULL,
 	"update_access" boolean DEFAULT false NOT NULL,
@@ -42,9 +42,38 @@ CREATE TABLE "project_users" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "project_threads" (
+	"id" integer PRIMARY KEY NOT NULL,
+	"project_id" integer NOT NULL,
+	"topic" text NOT NULL,
+	"description" text NOT NULL,
+	"assign_user_id" integer,
+	"priority" integer,
+	"due_date" date,
+	"end_date" date,
+	"thread_status" integer,
+	"type_of_issue" integer,
+	"link_issue" integer,
+	"is_deleted" boolean DEFAULT false
+);
+--> statement-breakpoint
+CREATE TABLE "tasks" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"thread_id" integer NOT NULL,
+	"title" text NOT NULL,
+	"description" text NOT NULL,
+	"git_link" text,
+	"created_user" integer,
+	"target_date" timestamp,
+	"task_status" text DEFAULT 'TODO',
+	"created_at" timestamp DEFAULT now(),
+	"updated_at" timestamp DEFAULT now(),
+	"is_deleted" boolean DEFAULT false
+);
+--> statement-breakpoint
 CREATE TABLE "user_sessions" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" integer NOT NULL,
 	"refresh_token" text NOT NULL,
 	"is_revoked" boolean DEFAULT false NOT NULL,
 	"expires_at" timestamp NOT NULL,
@@ -56,11 +85,15 @@ ALTER TABLE "projects" ADD CONSTRAINT "projects_deleted_by_users_id_fk" FOREIGN 
 ALTER TABLE "project_users" ADD CONSTRAINT "project_users_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "project_users" ADD CONSTRAINT "project_users_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "project_users" ADD CONSTRAINT "project_users_role_id_roles_id_fk" FOREIGN KEY ("role_id") REFERENCES "public"."roles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "project_threads" ADD CONSTRAINT "project_threads_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "project_threads" ADD CONSTRAINT "project_threads_assign_user_id_users_id_fk" FOREIGN KEY ("assign_user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_thread_id_project_threads_id_fk" FOREIGN KEY ("thread_id") REFERENCES "public"."project_threads"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_created_user_users_id_fk" FOREIGN KEY ("created_user") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_sessions" ADD CONSTRAINT "user_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "projects_created_by_idx" ON "projects" USING btree ("created_by");--> statement-breakpoint
 CREATE INDEX "projects_deleted_at_idx" ON "projects" USING btree ("deleted_at");--> statement-breakpoint
 CREATE INDEX "pm_project_id_idx" ON "project_users" USING btree ("project_id");--> statement-breakpoint
 CREATE INDEX "pm_user_id_idx" ON "project_users" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "pm_unique_member_idx" ON "project_users" USING btree ("project_id","user_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "pm_unique_member_idx" ON "project_users" USING btree ("project_id","user_id");--> statement-breakpoint
 CREATE INDEX "user_sessions_user_id_idx" ON "user_sessions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "user_sessions_refresh_token_idx" ON "user_sessions" USING btree ("refresh_token");

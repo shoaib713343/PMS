@@ -14,7 +14,7 @@ export const projectUsers = pgTable("project_users", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
 
-  roleId: serial("role_id")
+  roleId: integer("role_id")
     .notNull()
     .references(() => roles.id),
 

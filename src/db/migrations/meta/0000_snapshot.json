@@ -1,5 +1,5 @@
 {
-  "id": "88f19248-8904-4b7f-8bdd-fecbf5815043",
+  "id": "78e56a24-18fc-495a-b00d-d774d58f3275",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -10,10 +10,9 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "uuid",
+          "type": "serial",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
+          "notNull": true
         },
         "name": {
           "name": "name",
@@ -36,10 +35,9 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "uuid",
+          "type": "serial",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
+          "notNull": true
         },
         "first_name": {
           "name": "first_name",
@@ -123,10 +121,9 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "uuid",
+          "type": "serial",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
+          "notNull": true
         },
         "title": {
           "name": "title",
@@ -142,7 +139,7 @@
         },
         "created_by": {
           "name": "created_by",
-          "type": "uuid",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -168,7 +165,7 @@
         },
         "deleted_by": {
           "name": "deleted_by",
-          "type": "uuid",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         }
@@ -245,26 +242,25 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "uuid",
+          "type": "serial",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
+          "notNull": true
         },
         "project_id": {
           "name": "project_id",
-          "type": "uuid",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
         "user_id": {
           "name": "user_id",
-          "type": "uuid",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
         "role_id": {
           "name": "role_id",
-          "type": "uuid",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
@@ -358,7 +354,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": false,
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -411,6 +407,229 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.project_threads": {
+      "name": "project_threads",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "topic": {
+          "name": "topic",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "assign_user_id": {
+          "name": "assign_user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "priority": {
+          "name": "priority",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "due_date": {
+          "name": "due_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "end_date": {
+          "name": "end_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "thread_status": {
+          "name": "thread_status",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "type_of_issue": {
+          "name": "type_of_issue",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "link_issue": {
+          "name": "link_issue",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "project_threads_project_id_projects_id_fk": {
+          "name": "project_threads_project_id_projects_id_fk",
+          "tableFrom": "project_threads",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "project_threads_assign_user_id_users_id_fk": {
+          "name": "project_threads_assign_user_id_users_id_fk",
+          "tableFrom": "project_threads",
+          "tableTo": "users",
+          "columnsFrom": [
+            "assign_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tasks": {
+      "name": "tasks",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "thread_id": {
+          "name": "thread_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "git_link": {
+          "name": "git_link",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_user": {
+          "name": "created_user",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_date": {
+          "name": "target_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "task_status": {
+          "name": "task_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'TODO'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "is_deleted": {
+          "name": "is_deleted",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tasks_thread_id_project_threads_id_fk": {
+          "name": "tasks_thread_id_project_threads_id_fk",
+          "tableFrom": "tasks",
+          "tableTo": "project_threads",
+          "columnsFrom": [
+            "thread_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tasks_created_user_users_id_fk": {
+          "name": "tasks_created_user_users_id_fk",
+          "tableFrom": "tasks",
+          "tableTo": "users",
+          "columnsFrom": [
+            "created_user"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.user_sessions": {
       "name": "user_sessions",
       "schema": "",
@@ -423,7 +642,7 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "uuid",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         },
