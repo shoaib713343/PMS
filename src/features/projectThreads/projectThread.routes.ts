@@ -3,10 +3,9 @@ import * as controller from "./projectThread.controller";
 import { protect } from "../../middleware/authMiddleware";
 import { validate } from "../../middleware/validate";
 import { createThreadSchema } from "./projectThread.validation";
+import taskRouter from "../tasks/task.routes";
 
-const threadRouter = Router();
-export const topLevelThreadRouter = Router({mergeParams: true});
-
+const threadRouter = Router({mergeParams: true});
 
 threadRouter.post(
   "/",
@@ -38,5 +37,9 @@ threadRouter.delete(
   protect,
   controller.deleteThreadController
 );
+
+threadRouter.use(
+  "/:threadId/tasks", taskRouter
+)
 
 export default threadRouter;

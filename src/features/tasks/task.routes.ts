@@ -4,7 +4,7 @@ import { protect } from "../../middleware/authMiddleware";
 import { validate } from "../../middleware/validate";
 import { createtaskSchema, updateTaskSchema } from "./task.validation";
 
-const router = Router();
+const router = Router({mergeParams: true});
 
 router.post(
   "/threads/:threadId/tasks",
