@@ -6,6 +6,7 @@ import authRouter from "./features/auth/auth.routes";
 import projectRouter from "./features/projects/project.routes";
 import userRouter from "./features/users/user.routes";
 import rolesRouter from "./features/roles/role.routes";
+import threadRouter from "./features/projectThreads/projectThread.routes";
 import path from "path";
 
 const app = express();
@@ -34,6 +35,8 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/project", projectRouter);
 app.use("/api/v1/roles", rolesRouter);
+app.use("/api/v1/threads", projectRouter);
+app.use("/api/v1/tasks", projectRouter);
 
 app.use(errorHandler);
 

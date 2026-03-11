@@ -12,13 +12,11 @@ import {
   assignProjectMember,
   removeProjectMemberController,
 } from "./project.controller";
+import threadRouter from "../projectThreads/projectThread.routes";
 
 const router = Router();
 
-/**
- * CREATE PROJECT
- * Only admin / super_admin
- */
+
 router.post(
   "/",
   protect,
@@ -26,27 +24,21 @@ router.post(
   asyncHandler(createProjectController)
 );
 
-/**
- * LIST PROJECTS
- */
+
 router.get(
   "/",
   protect,
   asyncHandler(listProjectsController)
 );
 
-/**
- * GET SINGLE PROJECT
- */
+
 router.get(
   "/:projectId",
   protect,
   asyncHandler(getProjectDetailsController)
 );
 
-/**
- * UPDATE PROJECT
- */
+
 router.put(
   "/:projectId",
   protect,
@@ -54,9 +46,7 @@ router.put(
   asyncHandler(updateProjectController)
 );
 
-/**
- * DELETE PROJECT (soft delete)
- */
+
 router.delete(
   "/:projectId",
   protect,
@@ -64,9 +54,7 @@ router.delete(
   asyncHandler(deleteProjectController)
 );
 
-/**
- * ASSIGN PROJECT MEMBER
- */
+
 router.post(
   "/:projectId/members",
   protect,
@@ -74,14 +62,13 @@ router.post(
   asyncHandler(assignProjectMember)
 );
 
-/**
- * REMOVE PROJECT MEMBER
- */
 router.delete(
   "/:projectId/members/:userId",
   protect,
   allowRoles("admin", "super_admin"),
   asyncHandler(removeProjectMemberController)
 );
+
+router.use("/:projectId/threads", threadRouter);
 
 export default router;
