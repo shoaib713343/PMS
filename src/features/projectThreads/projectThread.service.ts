@@ -238,12 +238,14 @@ class ThreadService {
     }
 
     if(systemRole === "admin" || systemRole === "super_admin"){
-      await db
+       await db
       .update(projectThreads)
       .set({
         isDeleted: true
       })
       .where(eq(projectThreads.id, threadId));
+
+      return;
     }
 
     const membership = await db.query.projectUsers.findFirst({
