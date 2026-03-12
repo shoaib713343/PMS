@@ -4,11 +4,11 @@ import { ApiResponse } from "../../utils/ApiResponse";
 
 export const createThreadController = async (req: Request, res: Response) => {
 
-  const thread = await threadService.createThread({
+const thread = await threadService.createThread({
   ...req.body,
   projectId: Number(req.params.projectId),
   userId: req.user?.id,
-  systemRole: req.user?.systemRole
+  systemRole: req.user?.systemRole ?? ""
 });
 
   return res.status(201).json(
@@ -25,7 +25,8 @@ export const getThreadsByProjectIdController = async (req: Request, res: Respons
 
   const threads = await threadService.getThreadsByProjectId(
     Number(req.params.projectId),
-    Number(req.user?.id)
+    Number(req.user?.id),
+    req.user?.systemRole ?? ""
   );
 
   return res.status(200).json(
@@ -42,7 +43,8 @@ export const getThreadByIdController = async (req: Request, res: Response) => {
 
   const thread = await threadService.getThreadById(
     Number(req.params.threadId),
-    Number(req.user?.id)
+    Number(req.user?.id),
+    req.user?.systemRole ?? ""
   );
 
   return res.status(200).json(
@@ -60,7 +62,8 @@ export const updateThreadController = async (req: Request, res: Response) => {
   const updatedThread = await threadService.updateThread(
     Number(req.params.threadId),
     req.body,
-    Number(req.user?.id)
+    Number(req.user?.id),
+    req.user?.systemRole ?? ""
   );
 
   return res.status(200).json(
@@ -76,7 +79,8 @@ export const updateThreadStatusController = async (req: Request, res: Response) 
   const updatedThread = await threadService.updateThreadStatus(
     Number(req.params.threadId),
     Number(req.body.status),
-    Number(req.user?.id)
+    Number(req.user?.id),
+    req.user?.systemRole ?? ""
   )
 }
 
@@ -84,7 +88,8 @@ export const deleteThreadController = async (req: Request, res: Response) => {
 
   await threadService.deleteThread(
     Number(req.params.threadId),
-    Number(req.user?.id)
+    Number(req.user?.id),
+    req.user?.systemRole ?? ""
   );
 
   return res.status(200).json(

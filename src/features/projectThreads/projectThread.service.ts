@@ -5,6 +5,7 @@ import { projectThreads } from "../../db/schema/projectThreads";
 import { projectUsers } from "../../db/schema/projectUsers";
 
 import { ApiError } from "../../utils/ApiError";
+import { PROJECT_ROLES } from "../../constants/projectRoles";
 
 class ThreadService {
 
@@ -67,7 +68,16 @@ class ThreadService {
 
 
 
-  async getThreadsByProjectId(projectId: number, userId: number) {
+  async getThreadsByProjectId(projectId: number, userId: number, systemRole: string) {
+
+    if(systemRole === "admin" || systemRole === "super_admin"){
+    return db.select()
+      .from(projectThreads)
+      .where(and(
+        eq(projectThreads.projectId, projectId),
+        eq(projectThreads.isDeleted, false)
+      ));
+  }
 
     const membership = await db.query.projectUsers.findFirst({
       where: and(
@@ -93,7 +103,7 @@ class ThreadService {
 
 
 
-  async getThreadById(threadId: number, userId: number) {
+  async getThreadById(threadId: number, userId: number, systemRole: string) {
 
     const thread = await db.query.projectThreads.findFirst({
       where: eq(projectThreads.id, threadId)
@@ -101,6 +111,10 @@ class ThreadService {
 
     if (!thread || thread.isDeleted) {
       throw new ApiError(404, "Thread not found");
+    }
+
+    if(systemRole === "admin" || systemRole === "super_admin"){
+      return thread;
     }
 
     const membership = await db.query.projectUsers.findFirst({
@@ -119,7 +133,7 @@ class ThreadService {
 
 
 
-  async updateThread(threadId: number, data: any, userId: number) {
+  async updateThread(threadId: number, data: any, userId: number, systemRole: string) {
 
     const thread = await db.query.projectThreads.findFirst({
       where: eq(projectThreads.id, threadId)
@@ -127,6 +141,19 @@ class ThreadService {
 
     if (!thread || thread.isDeleted) {
       throw new ApiError(404, "Thread not found");
+    }
+
+    if(systemRole === "admin" || systemRole === "super_admin"){
+      const [updatedThread] = await db
+      .update(projectThreads)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(projectThreads.id, threadId))
+      .returning();
+
+    return updatedThread;
     }
 
     const membership = await db.query.projectUsers.findFirst({
@@ -152,24 +179,64 @@ class ThreadService {
     return updatedThread;
   }
 
-  async updateThreadStatus(threadId: number, status: number, userId: number){
-    const thread = await db.query.projectThreads.findFirst({
-      where: eq(projectThreads.id, threadId)
-    });
+  async updateThreadStatus(
+  threadId: number,
+  status: number,
+  userId: number,
+  systemRole: string
+){
 
-    if(!thread){
-      throw new ApiError(404, "Thread not found");
-    }
+  const thread = await db.query.projectThreads.findFirst({
+    where: eq(projectThreads.id, threadId)
+  });
 
-    const [updated] = await db.update(projectThreads).set({
-      threadStatus: status,
-    }).where(eq(projectThreads.id, threadId)).returning();
+  if(!thread){
+    throw new ApiError(404, "Thread not found");
+  }
+
+  if(systemRole === "admin" || systemRole === "super_admin"){
+    const [updated] = await db.update(projectThreads)
+      .set({ threadStatus: status })
+      .where(eq(projectThreads.id, threadId))
+      .returning();
 
     return updated;
   }
 
+  const membership = await db.query.projectUsers.findFirst({
+    where: and(
+      eq(projectUsers.projectId, thread.projectId),
+      eq(projectUsers.userId, userId)
+    )
+  });
 
-  async deleteThread(threadId: number, userId: number) {
+  if(!membership){
+    throw new ApiError(403, "User not part of this project");
+  }
+
+  if(membership.roleId !== PROJECT_ROLES.PROJECT_ADMIN){
+    throw new ApiError(403, "Only project admin can update thread status");
+  }
+
+  const [updated] = await db.update(projectThreads)
+    .set({ threadStatus: status })
+    .where(eq(projectThreads.id, threadId))
+    .returning();
+
+  return updated;
+}
+
+
+  async deleteThread(threadId: number, userId: number, systemRole: string) {
+
+    if(systemRole === "admin" || systemRole === "super_admin"){
+      await db
+      .update(projectThreads)
+      .set({
+        isDeleted: true
+      })
+      .where(eq(projectThreads.id, threadId));
+    }
 
     const thread = await db.query.projectThreads.findFirst({
       where: eq(projectThreads.id, threadId)
