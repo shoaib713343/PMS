@@ -229,6 +229,14 @@ class ThreadService {
 
   async deleteThread(threadId: number, userId: number, systemRole: string) {
 
+    const thread = await db.query.projectThreads.findFirst({
+      where: eq(projectThreads.id, threadId)
+    });
+
+    if (!thread || thread.isDeleted) {
+      throw new ApiError(404, "Thread not found");
+    }
+
     if(systemRole === "admin" || systemRole === "super_admin"){
       await db
       .update(projectThreads)
@@ -236,14 +244,6 @@ class ThreadService {
         isDeleted: true
       })
       .where(eq(projectThreads.id, threadId));
-    }
-
-    const thread = await db.query.projectThreads.findFirst({
-      where: eq(projectThreads.id, threadId)
-    });
-
-    if (!thread || thread.isDeleted) {
-      throw new ApiError(404, "Thread not found");
     }
 
     const membership = await db.query.projectUsers.findFirst({
