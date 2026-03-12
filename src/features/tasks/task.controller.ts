@@ -9,7 +9,8 @@ export async function createTaskController(req: Request, res: Response){
         description: req.body.description,
         gitLink: req.body.gitLink,
         targetDate: req.body.targetDate,
-        userId: req.user?.id
+        userId: req.user?.id,
+        systemRole: req.user?.systemRole
         });
 
         return res.status(201).json(
@@ -61,6 +62,18 @@ export async function updateTakController(req: Request, res: Response) {
         new ApiResponse(
             200,
             "Task updated successfully",
+            updatedTask
+        )
+    )
+}
+
+export async function updateTaskStatusController(req: Request, res: Response){
+    const updatedTask = await taskService.updateTaskStatus(Number(req.params.taskId), req.body.status);
+
+    return res.status(200).json(
+        new ApiResponse(
+            200,
+            "Task status updated successfully",
             updatedTask
         )
     )

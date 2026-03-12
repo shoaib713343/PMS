@@ -3,7 +3,8 @@ import { db } from "../../db";
 import { projectThreads } from "../../db/schema/projectThreads";
 import { tasks } from "../../db/schema/tasks";
 import { ApiError } from "../../utils/ApiError";
-import { projectUsers } from "../../db/schema";
+import { projectUsers, roles } from "../../db/schema";
+import { PROJECT_ROLES } from "../../constants/projectRoles";
 
 class TaskService{
 
@@ -14,7 +15,8 @@ class TaskService{
         description,
         gitLink,
         targetDate,
-        userId
+        userId,
+        systemRole
     }:any) {
         const thread = await db.query.projectThreads.findFirst({
             where: eq(projectThreads.id, threadId)
@@ -28,6 +30,20 @@ class TaskService{
             throw new ApiError(400, "Thread is closed");
         }
 
+        if(systemRole === "admin" || systemRole === "super_admin"){
+            const [task] = await db.insert(tasks).values({
+                threadId,
+                title,
+                description,
+                gitLink,
+                targetDate,
+                createdUser: userId,
+            }).returning();
+
+            return task;
+        }
+
+
         const membership = await db.query.projectUsers.findFirst({
             where: and(
                 eq(projectUsers.projectId, thread.projectId),
@@ -37,6 +53,11 @@ class TaskService{
         if(!membership){
             throw new ApiError(403, "You are not a member of this poject")
         }
+
+        if(membership.roleId !==  PROJECT_ROLES.PROJECT_ADMIN){
+    throw new ApiError(403, "Only project admin can create tasks")
+}
+
         if(!membership.writeAccess){
             throw new ApiError(403, "User cannot create tasks")
         }
@@ -155,6 +176,19 @@ class TaskService{
         .returning();
 
         return updatedTask;
+    }
+
+    async updateTaskStatus(taskId: number, status: string){
+        const [task] = await db.update(tasks).set({
+            taskStatus: status,
+            updatedAt: new Date()
+        }).where(eq(tasks.id, taskId)).returning();
+
+        if(!task){
+            throw new ApiError(404, "Task not found");
+        }
+
+        return task;
     }
 
     async deleteTask(taskId: number, userId: number){

@@ -8,12 +8,36 @@ import { ApiError } from "../../utils/ApiError";
 
 class ThreadService {
 
-  async createThread(data: any) {
+  async createThread({topic,
+  description,
+  priority,
+  assignUserId,
+  dueDate,
+  projectId,
+  userId,
+  systemRole}: any) {
+
+    if (systemRole === "admin" || systemRole === "super_admin") {
+
+    const [thread] = await db.insert(projectThreads)
+      .values({
+        topic,
+        description,
+        priority,
+        assignUserId,
+        dueDate,
+        projectId,
+        createdUser: userId
+      })
+      .returning();
+
+    return thread;
+  }
 
     const membership = await db.query.projectUsers.findFirst({
       where: and(
-        eq(projectUsers.projectId, data.projectId),
-        eq(projectUsers.userId, data.userId)
+        eq(projectUsers.projectId, projectId),
+        eq(projectUsers.userId, userId)
       )
     });
 
@@ -28,8 +52,13 @@ class ThreadService {
     const [thread] = await db
       .insert(projectThreads)
       .values({
-        ...data,
-        createdUser: data.userId
+        topic,
+        description,
+        priority,
+        assignUserId,
+        dueDate,
+        projectId,
+        createdUser: userId
       })
       .returning();
 
@@ -123,6 +152,21 @@ class ThreadService {
     return updatedThread;
   }
 
+  async updateThreadStatus(threadId: number, status: number, userId: number){
+    const thread = await db.query.projectThreads.findFirst({
+      where: eq(projectThreads.id, threadId)
+    });
+
+    if(!thread){
+      throw new ApiError(404, "Thread not found");
+    }
+
+    const [updated] = await db.update(projectThreads).set({
+      threadStatus: status,
+    }).where(eq(projectThreads.id, threadId)).returning();
+
+    return updated;
+  }
 
 
   async deleteThread(threadId: number, userId: number) {

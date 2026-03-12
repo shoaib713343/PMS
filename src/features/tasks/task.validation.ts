@@ -26,3 +26,12 @@ export const updateTaskSchema = z.object({
         targetDate: z.string().optional(),
     })
 })
+
+export const updateTaskStatusSchema = z.object({
+    param: z.object({
+        taskId: z.string()
+    }),
+    body: z.object({
+        status: z.enum(["pending", "in_progress", "completed"])
+    })
+})
