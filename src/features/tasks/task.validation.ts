@@ -1,7 +1,7 @@
 import {z} from "zod";
 
 export const createtaskSchema = z.object({
-    param: z.object({
+    params: z.object({
         threadId: z.string(),
     }),
     body: z.object({

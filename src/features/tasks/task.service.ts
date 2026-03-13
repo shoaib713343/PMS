@@ -56,10 +56,6 @@ class TaskService{
 
         if(membership.roleId !==  PROJECT_ROLES.PROJECT_ADMIN){
     throw new ApiError(403, "Only project admin can create tasks")
-}
-
-        if(!membership.writeAccess){
-            throw new ApiError(403, "User cannot create tasks")
         }
 
         const [task] = await db.insert(tasks)
