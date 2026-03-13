@@ -8,7 +8,7 @@ export async function createTaskController(req: Request, res: Response){
         title: req.body.title,
         description: req.body.description,
         gitLink: req.body.gitLink,
-        targetDate: req.body.targetDate,
+        targetDate: req.body.targetDate ? new Date(req.body.targetDate) : undefined,
         userId: Number(req.user?.id),
         systemRole: req.user?.systemRole
         });
