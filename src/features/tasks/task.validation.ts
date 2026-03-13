@@ -3,7 +3,6 @@ import {z} from "zod";
 export const createtaskSchema = z.object({
     param: z.object({
         threadId: z.string(),
-        userId: z.string(),
     }),
     body: z.object({
         title: z.string(),
