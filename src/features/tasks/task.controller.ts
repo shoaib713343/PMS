@@ -5,6 +5,7 @@ import { ApiResponse } from "../../utils/ApiResponse";
 export async function createTaskController(req: Request, res: Response){
     const task =  await taskService.createTask({
         taskId: Number(req.params.taskId),
+        threadId: Number(req.params.threadId),
         title: req.body.title,
         description: req.body.description,
         gitLink: req.body.gitLink,
