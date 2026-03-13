@@ -8,7 +8,7 @@ import { asyncHandler } from "../../utils/asyncHandler";
 const router = Router({mergeParams: true});
 
 router.post(
-  "/threads/:threadId/tasks",
+  "/",
   protect,
   validate(createtaskSchema),
   asyncHandler(
@@ -16,7 +16,7 @@ router.post(
 );
 
 router.get(
-  "/threads/:threadId/tasks",
+  "/",
   protect,
   asyncHandler(
   controller.getThreadTasks
@@ -25,7 +25,7 @@ router.get(
 
 
 router.get(
-  "/tasks/:taskId",
+  "/:taskId",
   protect,
   asyncHandler(
   controller.getTask
@@ -34,7 +34,7 @@ router.get(
 
 
 router.patch(
-  "/tasks/:taskId",
+  "/:taskId",
   protect,
   validate(updateTaskSchema),
   asyncHandler(
@@ -43,13 +43,13 @@ router.patch(
 );
 
 router.patch(
-  "/tasks/:taskId/status",
+  "/:taskId/status",
   protect, validate(updateTaskStatusSchema),
   asyncHandler(controller.updateTaskStatusController)
 )
 
 router.delete(
-  "/tasks/:taskId",
+  "/:taskId",
   protect,
   asyncHandler(
   controller.deleteTaskController
