@@ -82,6 +82,13 @@ export const updateThreadStatusController = async (req: Request, res: Response) 
     Number(req.user?.id),
     req.user?.systemRole ?? ""
   )
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      "Thread status updated successfully",
+      updatedThread
+    )
+  );
 }
 
 export const deleteThreadController = async (req: Request, res: Response) => {
