@@ -115,7 +115,7 @@ class TaskService{
     );
 };
 
-    async getTaskByIdService(taskId: number, userId: number){
+    async getTaskByIdService(taskId: number, userId: number, systemRole: string){
 
   const task = await db.query.tasks.findFirst({
     where: eq(tasks.id, taskId)
@@ -123,6 +123,10 @@ class TaskService{
 
   if (!task || task.isDeleted) {
     throw new ApiError(404, "Task not found");
+  }
+
+  if(systemRole === "admin" || systemRole === "super_admin"){
+    return task;
   }
 
   const thread = await db.query.projectThreads.findFirst({
@@ -147,10 +151,18 @@ class TaskService{
   return task;
 };
 
-    async updateTask(taskId: number, data: any, userId: number){
+    async updateTask(taskId: number, data: any, userId: number, systemRole: string){
         const task = await db.query.tasks.findFirst({
             where: eq(tasks.id, taskId)
         })
+
+        if(systemRole === "admin" || systemRole === "super_admin"){
+            const [updatedTask] = await db.update(tasks).set({
+                ...data
+            }).where(eq(tasks.id, taskId)).returning();
+
+            return updatedTask;
+        }
 
         if(!task || task.isDeleted){
             throw new ApiError(404, "Task not found");
@@ -185,20 +197,57 @@ class TaskService{
         return updatedTask;
     }
 
-    async updateTaskStatus(taskId: number, status: string){
-        const [task] = await db.update(tasks).set({
+    async updateTaskStatus(taskId: number, status: string, userId: number, systemRole: string){
+
+        const task = await db.query.tasks.findFirst({
+            where: eq(tasks.id, taskId)
+        })
+
+        if(systemRole === "admin" || systemRole === "super_admin"){
+            return await db.update(tasks).set({
             taskStatus: status,
             updatedAt: new Date()
         }).where(eq(tasks.id, taskId)).returning();
-
-        if(!task){
-            throw new ApiError(404, "Task not found");
         }
 
-        return task;
+        if(!task || task.isDeleted){
+            throw new ApiError(404, "Task not found");
+        }
+        const thread =  await db.query.projectThreads.findFirst({
+            where: eq(projectThreads.id, task.threadId)
+        });
+
+        if(!thread){
+            throw new ApiError(404, "Thread not found");
+        }
+
+        const membership = await db.query.projectUsers.findFirst({
+            where:
+                and(
+                    eq(projectUsers.projectId, thread.projectId),
+                    eq(projectUsers.userId, userId)
+                )
+            
+        })
+
+        if(!membership?.updateAccess){
+            throw new ApiError(403, "User cannot update task status");
+        }
+
+        return await db.update(tasks).set({
+            taskStatus: status,
+            updatedAt: new Date()
+        }).where(eq(tasks.id, taskId)).returning();
     }
 
-    async deleteTask(taskId: number, userId: number){
+    async deleteTask(taskId: number, userId: number, systemRole: string){
+        if(systemRole === "admin" || systemRole === "super_admin"){
+            await db.update(tasks).set({
+                isDeleted: true
+            }).where(eq(tasks.id, taskId));
+
+            return {success: true};
+        }
         const task = await db.query.tasks.findFirst({
             where: eq(tasks.id, taskId)
         })

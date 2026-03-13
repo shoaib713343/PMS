@@ -26,7 +26,8 @@ export async function getTask(req: Request, res: Response){
 
     const task = await taskService.getTaskByIdService(
       Number(req.params.taskId),
-      Number(req.user?.id)
+      Number(req.user?.id),
+      req.user?.systemRole!
     );
 
     return res.status(200).json(
@@ -57,7 +58,7 @@ export async function getThreadTasks(req: Request, res: Response) {
 }
 
 export async function updateTakController(req: Request, res: Response) {
-    const updatedTask = await taskService.updateTask(Number(req.params.taskId), req.body, req.user?.id!);
+    const updatedTask = await taskService.updateTask(Number(req.params.taskId), req.body, req.user?.id!, req.user?.systemRole!);
 
     return res.status(200).json(
         new ApiResponse(
@@ -69,7 +70,7 @@ export async function updateTakController(req: Request, res: Response) {
 }
 
 export async function updateTaskStatusController(req: Request, res: Response){
-    const updatedTask = await taskService.updateTaskStatus(Number(req.params.taskId), req.body.status);
+    const updatedTask = await taskService.updateTaskStatus(Number(req.params.taskId), req.body.status, req.user?.id!, req.user?.systemRole!);
 
     return res.status(200).json(
         new ApiResponse(
@@ -81,7 +82,7 @@ export async function updateTaskStatusController(req: Request, res: Response){
 }
 
 export async function deleteTaskController(req: Request, res: Response) {
-    await taskService.deleteTask(Number(req.params.taskId), req.user?.id!);
+    await taskService.deleteTask(Number(req.params.taskId), req.user?.id!, req.user?.systemRole!);
 
     return res.status(200).json(
         new ApiResponse(
