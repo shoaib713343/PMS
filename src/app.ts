@@ -7,6 +7,7 @@ import projectRouter from "./features/projects/project.routes";
 import userRouter from "./features/users/user.routes";
 import rolesRouter from "./features/roles/role.routes";
 import threadRouter from "./features/projectThreads/projectThread.routes";
+import taskRouter from "./features/tasks/task.routes";
 
 import path from "path";
 
@@ -39,6 +40,7 @@ app.use("/api/v1/users", userRouter);
 app.use("/api/v1/projects", projectRouter);
 app.use("/api/v1/roles", rolesRouter);
 app.use("/api/v1/threads", threadRouter);
+app.use("/api/v1/tasks", taskRouter);
 
 app.use(errorHandler);
 
