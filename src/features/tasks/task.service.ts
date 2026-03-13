@@ -151,14 +151,24 @@ class TaskService{
   return task;
 };
 
-    async updateTask(taskId: number, data: any, userId: number, systemRole: string){
+    async updateTask(title: string,
+        description: string,
+        gitLink: string,
+        targetDate: any,
+        userId: number,
+        systemRole: string,
+        taskId: number){
         const task = await db.query.tasks.findFirst({
             where: eq(tasks.id, taskId)
         })
 
         if(systemRole === "admin" || systemRole === "super_admin"){
             const [updatedTask] = await db.update(tasks).set({
-                ...data
+                title,
+                description,
+                gitLink,
+                targetDate,
+                updatedAt: new Date()
             }).where(eq(tasks.id, taskId)).returning();
 
             return updatedTask;
@@ -188,8 +198,11 @@ class TaskService{
         }
 
         const [updatedTask] =  await db.update(tasks).set({
-            ...data,
-            updatedAt: new Date()
+            title,
+                description,
+                gitLink,
+                targetDate,
+                updatedAt: new Date()
         })
         .where(eq(tasks.id, taskId))
         .returning();

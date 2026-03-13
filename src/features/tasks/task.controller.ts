@@ -58,8 +58,15 @@ export async function getThreadTasks(req: Request, res: Response) {
 }
 
 export async function updateTakController(req: Request, res: Response) {
-    const updatedTask = await taskService.updateTask(Number(req.params.taskId), req.body, req.user?.id!, req.user?.systemRole!);
-
+    const updatedTask = await taskService.updateTask(
+        req.body.title,
+        req.body.description,
+        req.body.gitLink,
+        req.body.targetDate ? new Date(req.body.targetDate) : undefined,
+        Number(req.user?.id),
+        req.user?.systemRole!,
+        Number(req.params.taskId)
+    )
     return res.status(200).json(
         new ApiResponse(
             200,
@@ -70,8 +77,13 @@ export async function updateTakController(req: Request, res: Response) {
 }
 
 export async function updateTaskStatusController(req: Request, res: Response){
-    const updatedTask = await taskService.updateTaskStatus(Number(req.params.taskId), req.body.status, req.user?.id!, req.user?.systemRole!);
+    const updatedTask = await taskService.updateTaskStatus(
+        Number(req.params.taskId),
+        req.body.status,
+        Number(req.user?.id),
+        req.user?.systemRole!,
 
+    )
     return res.status(200).json(
         new ApiResponse(
             200,
