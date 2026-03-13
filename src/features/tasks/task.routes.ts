@@ -7,6 +7,8 @@ import { asyncHandler } from "../../utils/asyncHandler";
 
 const router = Router({mergeParams: true});
 
+export const taskRouter = Router();
+
 router.post(
   "/",
   protect,
@@ -24,7 +26,7 @@ router.get(
 );
 
 
-router.get(
+taskRouter.get(
   "/:taskId",
   protect,
   asyncHandler(
@@ -33,7 +35,7 @@ router.get(
 );
 
 
-router.patch(
+taskRouter.patch(
   "/:taskId",
   protect,
   validate(updateTaskSchema),
@@ -42,13 +44,13 @@ router.patch(
   )
 );
 
-router.patch(
+taskRouter.patch(
   "/:taskId/status",
   protect, validate(updateTaskStatusSchema),
   asyncHandler(controller.updateTaskStatusController)
 )
 
-router.delete(
+taskRouter.delete(
   "/:taskId",
   protect,
   asyncHandler(
