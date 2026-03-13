@@ -72,7 +72,7 @@ class TaskService{
             return task;
     }
 
-    async getThreadTasksService(threadId: number, userId: number){
+    async getThreadTasksService(threadId: number, userId: number, systemRole: string) {
 
   const thread = await db.query.projectThreads.findFirst({
     where: eq(projectThreads.id, threadId)
@@ -80,6 +80,17 @@ class TaskService{
 
   if (!thread) {
     throw new ApiError(404, "Thread not found");
+  }
+
+  if(systemRole === "admin" || systemRole === "super_admin"){
+    return db.select()
+        .from(tasks)
+        .where(
+            and(
+                eq(tasks.threadId, threadId),
+                eq(tasks.isDeleted, false)
+            )
+        )
   }
 
   const membership = await db.query.projectUsers.findFirst({

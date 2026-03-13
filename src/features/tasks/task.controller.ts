@@ -43,7 +43,8 @@ export async function getTask(req: Request, res: Response){
 export async function getThreadTasks(req: Request, res: Response) {
     const tasks = await taskService.getThreadTasksService(
         Number(req.params.threadId),
-        Number(req.user?.id)
+        Number(req.user?.id),
+        req.user?.systemRole!
     );
 
     return res.status(200).json(
