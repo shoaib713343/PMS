@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 
 import { projectThreads } from "../../db/schema/projectThreads";
@@ -68,18 +68,12 @@ class ThreadService {
 
 
 
-  async getThreadsByProjectId(projectId: number, userId: number, systemRole: string) {
+  async getThreadsByProjectId(projectId: number, userId: number, systemRole: string, pagination: any) {
 
-    if(systemRole === "admin" || systemRole === "super_admin"){
-    return db.select()
-      .from(projectThreads)
-      .where(and(
-        eq(projectThreads.projectId, projectId),
-        eq(projectThreads.isDeleted, false)
-      ));
-  }
+    const {page, limit, offset} = pagination;
 
-    const membership = await db.query.projectUsers.findFirst({
+    if(!(systemRole === "admin" || systemRole === "super_admin")){
+      const membership = await db.query.projectUsers.findFirst({
       where: and(
         eq(projectUsers.projectId, projectId),
         eq(projectUsers.userId, userId)
@@ -89,16 +83,32 @@ class ThreadService {
     if (!membership || !membership.readAccess) {
       throw new ApiError(403, "No permission to view threads");
     }
+    }
 
-    return db
-      .select()
-      .from(projectThreads)
-      .where(
-        and(
-          eq(projectThreads.projectId, projectId),
-          eq(projectThreads.isDeleted, false)
-        )
-      );
+    const whereClause =  and(
+      eq(projectThreads.projectId, projectId),
+      eq(projectThreads.isDeleted, false)
+    )
+
+    const data = await db.query.projectThreads.findMany({
+      where: whereClause,
+      limit,
+      offset
+    })
+
+    const totalResult = await db.select({ count: sql<number>`count(*)` }).from(projectThreads).where(whereClause);
+
+    const total = totalResult[0]?.count || 0;
+
+    return {
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total/limit)
+      }
+    }
   }
 
 
