@@ -16,10 +16,9 @@ export const createtaskSchema = z.object({
 export const updateTaskSchema = z.object({
     params: z.object({
         taskId: z.string(),
-        userId: z.string()
     }),
     body: z.object({
-        title: z.string(),
+        title: z.string(),.optional(),
         description: z.string().optional(),
         gitLink: z.string().optional(),
         targetDate: z.string().optional(),
