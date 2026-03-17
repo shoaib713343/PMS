@@ -34,6 +34,7 @@ class AuthService{
             systemRole: systemRole
         }).returning({
             id: users.id,
+            name: users.firstName,
             email: users.email,
             role: users.systemRole
         });

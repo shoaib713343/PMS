@@ -1,4 +1,4 @@
-import { eq, isNull, and, sql, count } from "drizzle-orm";
+import { eq, isNull, and, sql, count, desc, asc } from "drizzle-orm";
 import { db } from "../../db";
 import { projectUsers, roles } from "../../db/schema";
 import { projects } from "../../db/schema/projects";
@@ -108,69 +108,52 @@ class ProjectService {
 async listProjects(
   userId: number,
   systemRole: string,
-  page: number,
-  limit: number
+  pagination: any,
+  query: any
 ) {
-  const offset = (page - 1) * limit;
-  const isAdmin =
-    systemRole === "admin" || systemRole === "super_admin";
+  const { page, limit, offset, sortBy, order} = pagination;
 
-  if (isAdmin) {
-    const data = await db
-      .select({
-        id: projects.id,
-        title: projects.title,
-        description: projects.description,
-      })
-      .from(projects)
-      .where(isNull(projects.deletedAt))
-      .limit(limit)
-      .offset(offset);
+  const isAdmin = systemRole === "admin" || systemRole === "super_admin";
 
-    const [{ total }] = await db
-      .select({ total: count() })
-      .from(projects)
-      .where(isNull(projects.deletedAt));
-
-    return {
-      data,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
-  }
-
-  // Non-admin
-  const data = await db
+  let baseQuery: any = db
     .select({
       id: projects.id,
       title: projects.title,
-      description: projects.description,
-    })
-    .from(projects)
-    .innerJoin(projectUsers, eq(projects.id, projectUsers.projectId))
-    .where(
-      and(
-        eq(projectUsers.userId, userId),
-        isNull(projects.deletedAt)
-      )
-    )
-    .limit(limit)
-    .offset(offset);
+      description: projects.description
+    }).from(projects);
 
-  const [{ total }] = await db
-    .select({ total: count() })
-    .from(projects)
-    .innerJoin(projectUsers, eq(projects.id, projectUsers.projectId))
-    .where(
-      and(
-        eq(projectUsers.userId, userId),
-        isNull(projects.deletedAt)
-      )
+  if (!isAdmin) {
+    baseQuery = baseQuery.innerJoin(projectUsers, eq(projects.id, projectUsers.projectId));
+  }
+
+  const whereClause = isAdmin ? isNull(projects.deletedAt) : and(
+    eq(projectUsers.userId, userId),
+    isNull(projects.deletedAt)
+  );
+
+  const sortingOption = {
+    createdAt: projects.createdAt,
+    title: projects.title,
+  }
+
+  const sortColumn = sortingOption[sortBy as keyof typeof sortingOption] || projects.createdAt;
+
+  const data = await baseQuery
+    .where(whereClause)
+    .orderBy(order === "asc" ? asc(sortColumn) : desc(sortColumn))
+    .limit(limit)
+    .offset(offset)
+
+    let countQuery : any = db.select({ total: count() }).from(projects);
+
+  if (!isAdmin) {
+    countQuery = countQuery.innerJoin(
+      projectUsers,
+      eq(projects.id, projectUsers.projectId)
     );
+  }
+
+  const [{ total }] = await countQuery.where(whereClause);
 
   return {
     data,

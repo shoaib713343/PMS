@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { projectService } from "./project.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 import { ApiError } from "../../utils/ApiError";
+import { getPagination } from "../../utils/pagination";
 
 export async function createProjectController(req: Request, res: Response){
 
@@ -20,14 +21,13 @@ export async function createProjectController(req: Request, res: Response){
 export const listProjectsController = async (req: Request, res: Response) => {
   const user = req.user!;
 
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 10;
+  const pagination = getPagination(req.query);
 
   const projects = await projectService.listProjects(
     Number(user.id),
     user.systemRole,
-    page,
-    limit
+    pagination,
+    req.query
   );
 
   res.status(200).json({

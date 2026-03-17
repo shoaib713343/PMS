@@ -29,7 +29,8 @@ export const getThreadsByProjectIdController = async (req: Request, res: Respons
     Number(req.params.projectId),
     Number(req.user?.id),
     req.user?.systemRole ?? "",
-    pagination
+    pagination,
+    req.query
   );
 
   return res.status(200).json(

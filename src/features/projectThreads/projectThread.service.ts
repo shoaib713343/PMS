@@ -68,10 +68,10 @@ class ThreadService {
 
 
 
-  async getThreadsByProjectId(projectId: number, userId: number, systemRole: string, pagination: any) {
+  async getThreadsByProjectId(projectId: number, userId: number, systemRole: string, pagination: any, query: any) {
 
-    const {page, limit, offset} = pagination;
-
+    const {page, limit, offset, sortBy, order} = pagination;
+    const {status} = query;
     if(!(systemRole === "admin" || systemRole === "super_admin")){
       const membership = await db.query.projectUsers.findFirst({
       where: and(
@@ -87,13 +87,25 @@ class ThreadService {
 
     const whereClause =  and(
       eq(projectThreads.projectId, projectId),
-      eq(projectThreads.isDeleted, false)
+      eq(projectThreads.isDeleted, false),
+      status ? eq(projectThreads.threadStatus, status) : undefined
     )
+
+    const sortOptions = {
+      createdAt: projectThreads.createdAt,
+      threadStatus: projectThreads.threadStatus,
+      priority: projectThreads.priority
+    };
+
+    const sortColumn = sortOptions[sortBy as keyof typeof sortOptions] || projectThreads.createdAt;
+
+
 
     const data = await db.query.projectThreads.findMany({
       where: whereClause,
       limit,
-      offset
+      offset,
+      orderBy: (t, {asc, desc})=> order === "asc" ? asc(sortColumn) : desc(sortColumn)
     })
 
     const totalResult = await db.select({ count: sql<number>`count(*)` }).from(projectThreads).where(whereClause);
