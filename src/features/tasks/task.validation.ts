@@ -18,7 +18,7 @@ export const updateTaskSchema = z.object({
         taskId: z.string(),
     }),
     body: z.object({
-        title: z.string(),.optional(),
+        title: z.string().optional(),
         description: z.string().optional(),
         gitLink: z.string().optional(),
         targetDate: z.string().optional(),
