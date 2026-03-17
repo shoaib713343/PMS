@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { projectThreads } from "../../db/schema/projectThreads";
 import { tasks } from "../../db/schema/tasks";
@@ -72,52 +72,83 @@ class TaskService{
             return task;
     }
 
-    async getThreadTasksService(threadId: number, userId: number, systemRole: string) {
+ async getThreadTasksService(
+  threadId: number,
+  userId: number,
+  systemRole: string,
+  pagination: any,
+  query: any
+) {
+  const { page, limit, offset, sortBy, order } = pagination;
+  const { status } = query;
 
   const thread = await db.query.projectThreads.findFirst({
-    where: eq(projectThreads.id, threadId)
+    where: eq(projectThreads.id, threadId),
   });
 
   if (!thread) {
     throw new ApiError(404, "Thread not found");
   }
 
-  if(systemRole === "admin" || systemRole === "super_admin"){
-    return db.select()
-        .from(tasks)
-        .where(
-            and(
-                eq(tasks.threadId, threadId),
-                eq(tasks.isDeleted, false)
-            )
-        )
+  if (!(systemRole === "admin" || systemRole === "super_admin")) {
+    const membership = await db.query.projectUsers.findFirst({
+      where: and(
+        eq(projectUsers.projectId, thread.projectId),
+        eq(projectUsers.userId, userId)
+      ),
+    });
+
+    if (!membership || !membership.readAccess) {
+      throw new ApiError(403, "No permission to view tasks");
+    }
   }
 
-  const membership = await db.query.projectUsers.findFirst({
-    where: and(
-      eq(projectUsers.projectId, thread.projectId),
-      eq(projectUsers.userId, userId)
-    )
+  const sortOptions = {
+    createdAt: tasks.createdAt,
+    taskStatus: tasks.taskStatus,
+    title: tasks.title,
+  };
+
+  const sortColumn =
+    sortOptions[sortBy as keyof typeof sortOptions] || tasks.createdAt;
+
+  const whereClause = and(
+    eq(tasks.threadId, threadId),
+    eq(tasks.isDeleted, false),
+    status ? eq(tasks.taskStatus, status) : undefined
+  );
+
+
+  const data = await db.query.tasks.findMany({
+    where: whereClause,
+    limit,
+    offset,
+    orderBy: (t, { asc, desc }) =>
+      order === "asc" ? asc(sortColumn) : desc(sortColumn),
   });
 
-  if (!membership || !membership.readAccess) {
-    throw new ApiError(403, "No permission to view tasks");
-  }
-
-  return db
-    .select()
+  const totalResult = await db
+    .select({ count: sql<number>`count(*)` })
     .from(tasks)
-    .where(
-      and(
-        eq(tasks.threadId, threadId),
-        eq(tasks.isDeleted, false)
-      )
-    );
-};
+    .where(whereClause);
 
-    async getTaskByIdService(taskId: number, userId: number, systemRole: string){
+  const total = Number(totalResult[0]?.count || 0);
 
-  const task = await db.query.tasks.findFirst({
+  return {
+    data,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+}
+
+    async getTaskByIdService(taskId: number, userId: number, systemRole: string) {
+
+  
+    const task = await db.query.tasks.findFirst({
     where: eq(tasks.id, taskId)
   });
 

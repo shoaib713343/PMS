@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { taskService } from "./task.service";
 import { ApiResponse } from "../../utils/ApiResponse";
+import { getPagination } from "../../utils/pagination";
 
 export async function createTaskController(req: Request, res: Response){
     const task =  await taskService.createTask({
@@ -27,7 +28,7 @@ export async function getTask(req: Request, res: Response){
     const task = await taskService.getTaskByIdService(
       Number(req.params.taskId),
       Number(req.user?.id),
-      req.user?.systemRole!
+      req.user?.systemRole!,
     );
 
     return res.status(200).json(
@@ -42,10 +43,14 @@ export async function getTask(req: Request, res: Response){
 
 
 export async function getThreadTasks(req: Request, res: Response) {
+
+    const pagination = getPagination(req.query);
     const tasks = await taskService.getThreadTasksService(
         Number(req.params.threadId),
         Number(req.user?.id),
-        req.user?.systemRole!
+        req.user?.systemRole!,
+        pagination,
+        req.query
     );
 
     return res.status(200).json(
