@@ -14,7 +14,7 @@ export const createtaskSchema = z.object({
 });
 
 export const updateTaskSchema = z.object({
-    param: z.object({
+    params: z.object({
         taskId: z.string(),
         userId: z.string()
     }),
@@ -27,7 +27,7 @@ export const updateTaskSchema = z.object({
 })
 
 export const updateTaskStatusSchema = z.object({
-    param: z.object({
+    params: z.object({
         taskId: z.string()
     }),
     body: z.object({
