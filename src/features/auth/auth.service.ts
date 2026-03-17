@@ -81,6 +81,7 @@ class AuthService{
         const payload = {
             id: user.id,
             email: user.email,
+            name: user.firstName,
             role: user.systemRole
         }
         const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, {expiresIn: process.env.JWT_EXPIRY!} as SignOptions);
