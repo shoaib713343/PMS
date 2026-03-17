@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { threadService } from "./projectThread.service";
 import { ApiResponse } from "../../utils/ApiResponse";
+import { getPagination } from "../../utils/pagination";
 
 export const createThreadController = async (req: Request, res: Response) => {
 
@@ -23,10 +24,12 @@ const thread = await threadService.createThread({
 
 export const getThreadsByProjectIdController = async (req: Request, res: Response) => {
 
+  const pagination = getPagination(req.query);
   const threads = await threadService.getThreadsByProjectId(
     Number(req.params.projectId),
     Number(req.user?.id),
-    req.user?.systemRole ?? ""
+    req.user?.systemRole ?? "",
+    pagination
   );
 
   return res.status(200).json(
