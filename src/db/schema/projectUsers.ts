@@ -11,7 +11,7 @@ export const projectUsers = pgTable("project_users", {
     .references(() => projects.id, { onDelete: "cascade" }),
 
   userId: integer("user_id")
-    .notNull()
+    .notNull().unique()
     .references(() => users.id, { onDelete: "cascade" }),
 
   roleId: integer("role_id")
