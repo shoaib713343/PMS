@@ -271,12 +271,6 @@ The following features are not yet implemented:
 
 ---
 
-### 10.5 Pagination
-
-* APIs return full datasets without pagination
-
----
-
 ### 10.6 Permission Handling
 
 * Permission checks are implemented but not centralized
@@ -304,6 +298,5 @@ The system is modular and can be extended with:
 * Messaging
 * Attachments
 * Activity tracking
-* Pagination
 
 ---

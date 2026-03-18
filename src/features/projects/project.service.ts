@@ -1,6 +1,6 @@
 import { eq, isNull, and, sql, count, desc, asc } from "drizzle-orm";
 import { db } from "../../db";
-import { projectUsers, roles } from "../../db/schema";
+import { projectUsers, roles, users } from "../../db/schema";
 import { projects } from "../../db/schema/projects";
 import { ApiError } from "../../utils/ApiError";
 
@@ -173,25 +173,54 @@ async listProjects(
   ) {
     const isAdmin = systemRole === "admin" || systemRole === "super_admin";
 
-    const conditions = [eq(projects.id, projectId), isNull(projects.deletedAt)];
+    if(!isAdmin){
+      const membership = await db.query.projectUsers.findFirst({
+        where: and(
+          eq(projectUsers.projectId, projectId),
+          eq(projectUsers.userId, userId)
+        )
+      });
 
-    if (!isAdmin) {
-      conditions.push(eq(projectUsers.userId, userId));
+      if(!membership){
+        throw new ApiError(404, "Project not found or access denied");
+      }
     }
 
     const result = await db
       .select()
       .from(projects)
       .leftJoin(projectUsers, eq(projects.id, projectUsers.projectId))
-      .where(and(...conditions));
+      .leftJoin(users, eq(projectUsers.userId, users.id))
+      .leftJoin(roles, eq(projectUsers.roleId, roles.id));
 
-    const [project] = result;
-
-    if (!project) {
-      throw new ApiError(404, "Project not found or access denied");
+    if(!result.length){
+      throw new ApiError(404, "Project not found");
     }
 
-    return project;
+    const project = result[0].projects
+
+    const members = result.filter(r => r.project_users != null).map(r => ({
+      userId: r.users?.id,
+      userName: r.users?.firstName,
+      roleName: r.roles?.name,
+      readAccess: r.project_users?.readAccess,
+      writeAccess: r.project_users?.writeAccess,
+      updateAccess: r.project_users?.updateAccess,
+      deleteAccess: r.project_users?.deleteAccess,
+    }))
+
+    return {
+      id: project.id,
+    title: project.title,
+    description: project.description,
+
+    createdBy: project.createdBy,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+    deletedAt: project.deletedAt,
+
+    members
+    }
   }
 
   async updateProject(
