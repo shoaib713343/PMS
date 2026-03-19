@@ -45,7 +45,7 @@ export const getProjectDetailsController = async (
   const user = req.user!;
 
   const project = await projectService.getProjectDetails(
-    projectId,
+    Number(projectId),
     Number(user.id),
     user.systemRole
   );
