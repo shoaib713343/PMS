@@ -23,10 +23,10 @@ export const createProjectSchema = z.object({
 
 export const assignUserSchema = z.object({
   params: z.object({
-    projectId: z.string().uuid(),
+    projectId: z.string(),
   }),
   body: z.object({
-    userId: z.string().uuid(),
+    userId: z.string(),
     roleName: z.string().min(2).max(100),
   }),
 });

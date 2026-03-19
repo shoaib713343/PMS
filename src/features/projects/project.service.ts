@@ -197,7 +197,8 @@ async listProjects(
       .from(projects)
       .leftJoin(projectUsers, eq(projects.id, projectUsers.projectId))
       .leftJoin(users, eq(projectUsers.userId, users.id))
-      .leftJoin(roles, eq(projectUsers.roleId, roles.id));
+      .leftJoin(roles, eq(projectUsers.roleId, roles.id))
+      .where(eq(projects.id, projectId));
 
     if(!result.length){
       throw new ApiError(404, "Project not found");
