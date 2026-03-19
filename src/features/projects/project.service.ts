@@ -66,14 +66,12 @@ class ProjectService {
   }) {
     return await db.transaction(async (tx) => {
       const [role] = await tx
-        .insert(roles)
-        .values({
-          name: options.roleName,
-        })
-        .returning();
+        .select()
+        .from(roles)
+        .where(eq(roles.name, options.roleName));
 
       if (!role) {
-        throw new ApiError(500, "Role creation failed");
+        throw new ApiError(500, "Role not found");
       }
 
       const existing = await tx
@@ -87,7 +85,15 @@ class ProjectService {
         );
 
       if (existing.length > 0) {
-        throw new ApiError(400, "User already assigned to this project");
+        await tx.update(projectUsers)
+          .set({ roleId: role.id})
+          .where(
+            and(
+              eq(projectUsers.projectId, options.projectId),
+              eq(projectUsers.userId, options.userId)
+            )
+          )
+          return true;
       }
 
       await tx.insert(projectUsers).values({

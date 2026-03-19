@@ -5,19 +5,20 @@ import { getPagination } from "../../utils/pagination";
 
 export const createThreadController = async (req: Request, res: Response) => {
 
-const thread = await threadService.createThread({
-  ...req.body,
-  projectId: Number(req.params.projectId),
-  userId: req.user?.id,
-  systemRole: req.user?.systemRole ?? ""
-});
+  const thread = await threadService.createThread({
+    topic: req.body.topic,
+    description: req.body.description,
+    priority: req.body.priority,
+    assignUserId: req.body.assignUserId,
+    dueDate: req.body.dueDate,
+
+    projectId: Number(req.params.projectId),
+    userId: req.user?.id,
+    systemRole: req.user?.systemRole ?? ""
+  });
 
   return res.status(201).json(
-    new ApiResponse(
-      201,
-      "Thread created successfully",
-      thread
-    )
+    new ApiResponse(201, "Thread created successfully", thread)
   );
 };
 
