@@ -324,7 +324,8 @@ class TaskService {
     targetDate: any,
     userId: number,
     systemRole: string,
-    taskId: number
+    taskId: number,
+    status?: string
   ) {
     const task = await db.query.tasks.findFirst({
       where: eq(tasks.id, taskId),
@@ -336,7 +337,7 @@ class TaskService {
 
     if (systemRole === "admin" || systemRole === "super_admin") {
       return await db.update(tasks)
-        .set({ title, description, gitLink, targetDate, updatedAt: new Date() })
+        .set({ title, description, gitLink, targetDate, updatedAt: new Date(), taskStatus: status })
         .where(eq(tasks.id, taskId))
         .returning();
     }
