@@ -102,7 +102,7 @@ export async function updateTakController(req: Request, res: Response) {
         Number(req.user?.id),
         req.user?.systemRole!,
         Number(req.params.taskId),
-        req.body.status
+        req.body.taskStatus
     )
     return res.status(200).json(
         new ApiResponse(
