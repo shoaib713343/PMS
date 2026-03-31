@@ -10,7 +10,7 @@ export async function createTaskController(req: Request, res: Response) {
     title,
     description,
     gitLink,
-    targetDate,
+    targetDate, 
     assignedUserIds,
   } = req.body;
 
@@ -22,7 +22,7 @@ export async function createTaskController(req: Request, res: Response) {
     title,
     description,
     gitLink,
-    targetDate,
+    targetDate: targetDate ? new Date(targetDate) : undefined,
     userId,
     systemRole,
     assignedUserIds,
