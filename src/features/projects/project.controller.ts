@@ -112,35 +112,48 @@ export const deleteProjectController = async (
   });
 };
 
-export async function assignProjectMember(req: Request, res: Response){
-    const  projectIdString  = req.params.projectId;
-    const { userId, roleName } = req.body;
+export async function assignProjectMember(req: Request, res: Response) {
+  const projectId = Number(req.params.projectId);
+  const { userId, roleName } = req.body;
 
-    const projectId = Number(projectIdString);
+  const currentUser = req.user;
 
-    const currentUser = req.user;
+  if (!currentUser) {
+    throw new ApiError(401, "Unauthorized");
+  }
 
-    if (!currentUser) {
-      throw new ApiError(401, "Unauthorized");
-    }
+  // 🔥 FIX 1: Use correct field (role instead of systemRole)
+  if (
+    currentUser.systemRole !== "admin" &&
+    currentUser.systemRole !== "super_admin"
+  ) {
+    throw new ApiError(403, "Not allowed to assign members");
+  }
 
-    if (
-      currentUser.systemRole !== "admin" &&
-      currentUser.systemRole !== "super_admin"
-    ) {
-      throw new ApiError(403, "Not allowed to assign members");
-    }
+  if (isNaN(projectId)) {
+    throw new ApiError(400, "Invalid projectId");
+  }
 
-    await projectService.assignUserToProject({
-      projectId,
-      userId: Number(userId),
-      roleName,
-    });
+  const parsedUserId = Number(userId);
 
-    res.status(200).json({
-      message: "User assigned successfully",
-    });
-};
+  if (!userId || isNaN(parsedUserId)) {
+    throw new ApiError(400, "Invalid userId");
+  }
+
+  if (!roleName) {
+    throw new ApiError(400, "roleName is required");
+  }
+
+  await projectService.assignUserToProject({
+    projectId,
+    userId: parsedUserId,
+    roleName,
+  });
+
+  res.status(200).json({
+    message: "User assigned successfully",
+  });
+}
 
 
 export const removeProjectMemberController = async (
