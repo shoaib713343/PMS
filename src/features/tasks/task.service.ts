@@ -358,7 +358,7 @@ class TaskService {
     }
 
     return await db.update(tasks)
-      .set({ title, description, gitLink, targetDate, updatedAt: new Date() })
+      .set({ title, description, gitLink, targetDate, updatedAt: new Date(), taskStatus: status })
       .where(eq(tasks.id, taskId))
       .returning();
   }
