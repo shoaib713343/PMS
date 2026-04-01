@@ -29,9 +29,9 @@ The system is built using:
 Feature-based modular architecture:
 
 * Controllers → Services → Database
-* Middleware for auth, validation, error handling
+* Middleware for authentication, validation, and error handling
 
-Ensures scalability and maintainability.
+Ensures scalability, maintainability, and clean separation of concerns.
 
 ---
 
@@ -45,8 +45,16 @@ Ensures scalability and maintainability.
 
 ### Authentication
 
-* POST /auth/login
 * POST /auth/register
+* POST /auth/login
+* POST /auth/refresh
+* POST /auth/logout
+
+Features:
+
+* JWT-based authentication
+* Refresh token rotation
+* Secure cookie handling
 
 ---
 
@@ -63,6 +71,12 @@ Ensures scalability and maintainability.
 * POST /projects/:projectId/members
 * DELETE /projects/:projectId/members/:userId
 
+Features:
+
+* Creator-based ownership logic
+* Project-level role assignment
+* Validation to prevent invalid or duplicate assignments
+
 ---
 
 ### Threads
@@ -70,6 +84,11 @@ Ensures scalability and maintainability.
 Base:
 
 * /projects/:projectId/threads
+
+Features:
+
+* Thread creation and retrieval
+* Acts as a container for tasks and messages
 
 ---
 
@@ -79,12 +98,34 @@ Base:
 * GET /threads/:threadId/tasks
 * GET /tasks/:taskId
 * PATCH /tasks/:taskId
-* DELETE /tasks/:taskId
 * PATCH /tasks/:taskId/status
+* DELETE /tasks/:taskId
+
+Features:
+
+* Task assignment to project members
+* Status management (pending → in_progress → completed)
+* Validation to ensure assigned users belong to the project
+* Soft deletion support
 
 ---
 
-### Attachments (NEW)
+### Messaging
+
+* POST /threads/:threadId/messages
+* POST /threads/:threadId/messages/:messageId/replies
+* GET /threads/:threadId/messages
+
+Features:
+
+* Thread-based messaging system
+* Nested replies using parent-child relationship
+* Replies linked via parentId
+* Structured response with grouped replies
+
+---
+
+### Attachments
 
 #### Task Attachments
 
@@ -93,43 +134,35 @@ Base:
 
 Features:
 
-* Upload using Multer
-* Stored in Cloudinary
-* Metadata saved in PostgreSQL
+* File upload using Multer (memory storage)
+* Cloudinary integration for storage
+* Supports images and PDFs
+* Metadata stored in PostgreSQL
 * Synchronized deletion (Cloudinary + DB)
 
 ---
 
-### Messaging
-
-* Thread-based messaging
-* Nested replies supported
-
----
-
-## 5. File Handling System (NEW)
+## 5. File Handling System
 
 ### 5.1 Project-Level File
 
 * Field: user_manual
 * Uploaded during project creation
 * Stored in Cloudinary
-* Used for documentation/specification
 
 ---
 
 ### 5.2 Task Attachments
 
 * Multiple files per task
-* Supports images and PDFs
-* Stored in Cloudinary
 * Linked via attachments table
+* Stored in Cloudinary
 
 ---
 
 ### 5.3 File Validation
 
-* MIME type validation (images + PDF)
+* MIME type validation
 * File size restriction
 * Secure upload handling
 
@@ -150,8 +183,12 @@ Features:
 
 ### Access Control
 
-* Role-based access implemented
-* Middleware + service-level checks
+* Role-based access control implemented
+* Combination of middleware and service-level validation
+* Permissions enforced for:
+  * Project operations
+  * Task operations
+  * Messaging access
 
 ---
 
@@ -170,7 +207,11 @@ Features:
 
 * Centralized error handler
 * Custom ApiError & ApiResponse
-* Handles validation and runtime errors
+* Handles:
+
+  * Validation errors
+  * JWT errors
+  * Database errors
 
 ---
 
@@ -184,15 +225,16 @@ Features:
 * project_users
 * project_threads
 * tasks
+* task_assignees
 * messages
-* attachments (NEW)
+* attachments
 
 ---
 
 ### Relationships
 
-Project → Threads → Tasks → Attachments
-Project → Threads → Messages → Replies
+Project → Threads → Tasks → Attachments  
+Project → Threads → Messages → Replies  
 
 ---
 
@@ -200,30 +242,39 @@ Project → Threads → Messages → Replies
 
 * Backend deployed on Render
 * PostgreSQL hosted on Neon
+* Cloudinary for file storage
 * Environment variables managed securely
 
 ---
 
-## 11. Current Gaps / Pending Work
+## 11. Current Status
 
-### Frontend Integration
+### Completed
 
-* UI not yet implemented
-* APIs ready for consumption
-
----
-
-### Activity Logs
-
-* Not implemented
-* Future: audit tracking system
+* Core backend fully functional
+* Authentication with JWT + refresh tokens
+* Project, thread, and task workflows
+* Messaging system with replies
+* File uploads and attachments
+* Role-based access control
+* Input validation and error handling
 
 ---
 
-### Permission Optimization
+### Partially Completed
 
-* Currently mixed (service + middleware)
-* Future: centralized RBAC middleware
+* Permission handling (partially centralized, still mixed)
+* Thread module (basic functionality stable, limited enhancements)
+
+---
+
+### Pending / Future Improvements
+
+* Frontend integration (APIs ready)
+* Activity logs / audit tracking
+* Centralized permission system
+* Advanced validation and security enhancements
+* Automated testing (unit/integration)
 
 ---
 
@@ -231,21 +282,18 @@ Project → Threads → Messages → Replies
 
 The backend system is:
 
-* Modular and scalable
 * Fully functional for core workflows
-* Production-ready for backend services
+* Modular and scalable in design
+* Stable for integration with frontend
 
 Key strengths:
 
 * Clean architecture
 * Role-based access control
-* File handling with Cloudinary
-* Robust error handling
+* Optimized database usage (reduced redundant queries)
+* Cloud-based file handling (Cloudinary)
+* Structured messaging system with replies
 
-Future scope includes:
-
-* Frontend UI
-* Activity tracking
-* Advanced permission management
+The system is ready for frontend integration and further enhancement.
 
 ---

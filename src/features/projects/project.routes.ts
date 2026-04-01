@@ -2,6 +2,7 @@ import { Router } from "express";
 import { protect } from "../../middleware/authMiddleware";
 import { allowRoles } from "../../middleware/rbac";
 import { asyncHandler } from "../../utils/asyncHandler";
+import logsRouter from "../activity/activity.routes";
 
 import {
   createProjectController,
@@ -69,6 +70,7 @@ router.delete(
   asyncHandler(removeProjectMemberController)
 );
 
+router.use("/:projectId/activity", logsRouter);
 router.use("/:projectId/threads", threadRouter);
 
 export default router;
