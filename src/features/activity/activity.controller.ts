@@ -4,6 +4,14 @@ import { getProjectActivityLogs } from "./activity.service";
 
 export const getProjectActivityLogsController = async (req: Request, res: Response) => {
     const projectId = Number(req.params.projectId);
+    if(!projectId || isNaN(projectId)){
+        return res.status(400).json(
+            new ApiResponse(
+                400,
+                "Invalid project ID"
+            )
+        );
+    }
     const limit = Number(req.query.limit) || 20;
     const offset = Number(req.query.offset) || 0;
     const logs = await getProjectActivityLogs(projectId, limit, offset);
