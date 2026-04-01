@@ -4,6 +4,6 @@ import { protect } from "../../middleware/authMiddleware";
 
 const router = Router();
 
-router.get("/dashboard", protect, getDashboardController);
+router.get("/", protect, getDashboardController);
 
 export default router;
