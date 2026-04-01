@@ -28,7 +28,7 @@ export const logActivity = async({
     })
 }
 
-export const getProjectActivityLogs = async(projectId: number, limit: number, offset: number) => {
+export const getProjectActivityLogs = async(projectId: number, limit: number, offset: number, entity: string) => {
     const logs = await db.select({
         id: activityLogs.id,
         action: activityLogs.action,
@@ -38,6 +38,6 @@ export const getProjectActivityLogs = async(projectId: number, limit: number, of
         createdAt: activityLogs.createdAt,
         userName: users.firstName,
     }).from(activityLogs)
-       .leftJoin(users, eq(users.id, activityLogs.userId)).where(eq(activityLogs.projectId, projectId)).orderBy(desc(activityLogs.createdAt)).limit(limit).offset(offset);
+       .leftJoin(users, eq(users.id, activityLogs.userId)).where(entity ? eq(activityLogs.entity, entity) : undefined).orderBy(desc(activityLogs.createdAt)).limit(limit).offset(offset);
     return logs;
 }

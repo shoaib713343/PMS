@@ -14,7 +14,7 @@ export const getProjectActivityLogsController = async (req: Request, res: Respon
     }
     const limit = Number(req.query.limit) || 20;
     const offset = Number(req.query.offset) || 0;
-    const logs = await getProjectActivityLogs(projectId, limit, offset);
+    const logs = await getProjectActivityLogs(projectId, limit, offset, req.query.entity as string);
 
     return res.status(200).json(
         new ApiResponse(
