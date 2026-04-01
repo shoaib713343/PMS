@@ -15,7 +15,7 @@ import { projectUsers } from "../../db/schema";
 import { taskAssignees } from "../../db/schema/taskAssignees";
 import { ApiError } from "../../utils/ApiError";
 import { PROJECT_ROLES } from "../../constants/projectRoles";
-import { logActivity } from "../activity/activity.service";
+import { logActivity} from "../activity/activity.service";
 
 class TaskService {
 
@@ -87,7 +87,7 @@ class TaskService {
     projectId: thread.projectId,
     metadata: {
       title: task.title,
-      threadId: task.threadId,
+      threadId: thread.id
     },
   });
 

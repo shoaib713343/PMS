@@ -1,26 +1,33 @@
 import { Request, Response } from "express";
-import { ApiResponse } from "../../utils/ApiResponse";
-import { getProjectActivityLogs } from "./activity.service";
+import { getProjectActivity } from "./activity.service";
+import { ApiError } from "../../utils/ApiError";
 
-export const getProjectActivityLogsController = async (req: Request, res: Response) => {
-    const projectId = Number(req.params.projectId);
-    if(!projectId || isNaN(projectId)){
-        return res.status(400).json(
-            new ApiResponse(
-                400,
-                "Invalid project ID"
-            )
-        );
-    }
-    const limit = Number(req.query.limit) || 20;
-    const offset = Number(req.query.offset) || 0;
-    const logs = await getProjectActivityLogs(projectId, limit, offset, req.query.entity as string);
+export const getProjectActivityController = async (
+  req: Request,
+  res: Response
+) => {
+  const projectId = Number(req.params.projectId);
 
-    return res.status(200).json(
-        new ApiResponse(
-            200,
-            "Activity logs fetched successfully",
-            logs
-        )
-    )
-}
+  if (!projectId || isNaN(projectId)) {
+    throw new ApiError(400, "Invalid project ID");
+  }
+
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 20;
+
+  const entity = req.query.entity as string | undefined;
+  const action = req.query.action as string | undefined;
+
+  const result = await getProjectActivity({
+    projectId,
+    page,
+    limit,
+    entity,
+    action,
+  });
+
+  return res.json({
+    success: true,
+    ...result,
+  });
+};
