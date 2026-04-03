@@ -3,15 +3,13 @@ import { roleService } from "./role.service";
 import { ApiResponse } from "../../utils/ApiResponse";
 
 export async function createRoleController(req: Request, res: Response){
-    const role = await roleService.createRoles(req.body.name);
-
-    return res.status(201).json(
-        new ApiResponse(
+    const role = await roleService.createRoles(req.body.name, req.user!);
+        return new ApiResponse(
             201,
             "Role created successfully",
             role
         )
-    )
+    
 }
 
 export async function listRolesController(req: Request, res: Response){
@@ -39,7 +37,7 @@ export async function listRoleByIdController(req: Request, res: Response){
 }
 
 export async function updateRoleController(req: Request, res: Response){
-    const role = await roleService.updateRole(Number(req.params.id), req.body.name);
+    const role = await roleService.updateRole(Number(req.params.id), req.body.name, req.user!);
 
     return res.status(200).json(
         new ApiResponse(200, "role updated successfully", role)
@@ -47,7 +45,7 @@ export async function updateRoleController(req: Request, res: Response){
 }
 
 export async function deleteRoleController(req: Request, res: Response){
-    await roleService.deleteRole(Number(req.params.id.toString));
+    await roleService.deleteRole(Number(req.params.id), req.user!);
 
     return res.status(200).json(
         new ApiResponse(200, 
