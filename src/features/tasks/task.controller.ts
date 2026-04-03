@@ -14,8 +14,7 @@ export async function createTaskController(req: Request, res: Response) {
     assignedUserIds,
   } = req.body;
 
-  const userId = req.user?.id;
-  const systemRole = req.user?.systemRole;
+  const user = req.user!;
 
   const task = await taskService.createTask({
     threadId: Number(threadId),
@@ -23,10 +22,8 @@ export async function createTaskController(req: Request, res: Response) {
     description,
     gitLink,
     targetDate: targetDate ? new Date(targetDate) : undefined,
-    userId,
-    systemRole,
     assignedUserIds,
-  });
+  }, user);
 
   return res.status(201).json(
     new ApiResponse(201, "Task created successfully", task)
@@ -34,15 +31,14 @@ export async function createTaskController(req: Request, res: Response) {
 }
 
 export async function getAllTasksController(req: Request, res: Response) {
-  const userId = req.user?.id;
-  const role = req.user?.systemRole!;
+  const user = req.user!;
 
   const page = Number(req.query.page) || 1;
   const limit = Number(req.query.limit) || 10;
   const sortBy = req.query.sortBy as string;
   const order = req.query.order as string;
 
-  const result = await taskService.getTasksForUser(Number(userId), role, {
+  const result = await taskService.getTasksForUser(user, {
     page,
     limit,
     sortBy,
@@ -56,10 +52,9 @@ export async function getAllTasksController(req: Request, res: Response) {
 
 export async function getTask(req: Request, res: Response){
 
-    const task = await taskService.getTaskByIdService(
+    const task = await taskService.getTaskById(
       Number(req.params.taskId),
-      Number(req.user?.id),
-      req.user?.systemRole!,
+      req.user!
     );
 
     return res.status(200).json(
@@ -78,8 +73,7 @@ export async function getThreadTasks(req: Request, res: Response) {
     const pagination = getPagination(req.query);
     const tasks = await taskService.getThreadTasksService(
         Number(req.params.threadId),
-        Number(req.user?.id),
-        req.user?.systemRole!,
+        req.user!,
         pagination,
         req.query
     );
@@ -93,32 +87,34 @@ export async function getThreadTasks(req: Request, res: Response) {
     )
 }
 
-export async function updateTakController(req: Request, res: Response) {
+export async function updateTaskController(req: Request, res: Response) {
     const updatedTask = await taskService.updateTask(
-        req.body.title,
-        req.body.description,
-        req.body.gitLink,
-        req.body.targetDate ? new Date(req.body.targetDate) : undefined,
-        Number(req.user?.id),
-        req.user?.systemRole!,
-        Number(req.params.taskId),
-        req.body.taskStatus
-    )
+      Number(req.params.taskId),
+      {
+        title: req.body.title,
+        description: req.body.description,
+        gitLink: req.body.gitLink,
+        targetDate: req.body.targetDate ? new Date(req.body.targetDate) : undefined,
+        taskStatus: req.body.taskStatus
+      },
+      req.user!
+    );
+    
     return res.status(200).json(
-        new ApiResponse(
-            200,
-            "Task updated successfully",
-            updatedTask
-        )
-    )
+      new ApiResponse(
+        200,
+        "Task updated successfully",
+        updatedTask
+      )
+    );
+  
 }
 
 export async function updateTaskStatusController(req: Request, res: Response){
     const updatedTask = await taskService.updateTaskStatus(
         Number(req.params.taskId),
         req.body.status,
-        Number(req.user?.id),
-        req.user?.systemRole!,
+        req.user!
 
     )
     return res.status(200).json(
@@ -131,7 +127,7 @@ export async function updateTaskStatusController(req: Request, res: Response){
 }
 
 export async function deleteTaskController(req: Request, res: Response) {
-    await taskService.deleteTask(Number(req.params.taskId), req.user?.id!, req.user?.systemRole!);
+    await taskService.deleteTask(Number(req.params.taskId), req.user!);
 
     return res.status(200).json(
         new ApiResponse(

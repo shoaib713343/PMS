@@ -6,15 +6,27 @@ import { db } from "../db";
 import { eq } from "drizzle-orm";
 import { asyncHandler } from "../utils/asyncHandler";
 
-type UserType = typeof users.$inferSelect;
+type AuthUser = {
+  id: number;
+  email: string;
+  name: string;
+  systemRole: "admin" | "user" | "super_admin";
+};
 
 declare global {
     namespace Express {
         interface Request {
-            user?: Omit<UserType, 'password'>;
+            user?: AuthUser;
         }
     }
 }
+
+type JwtPayload = {
+  id: number;
+  email: string;
+  name: string;
+  systemRole: "admin" | "user" | "super_admin";
+};
 
 async function protectLogic(req: Request, res: Response, next: NextFunction){
     const authHeader = req.headers.authorization;
@@ -30,17 +42,22 @@ async function protectLogic(req: Request, res: Response, next: NextFunction){
     if (!secret) {
     throw new ApiError(500, 'Internal server error: JWT secret is not configured');
   }
-  const decoded = jwt.verify(token, secret) as {id: number };
+  const decoded = jwt.verify(token, secret) as JwtPayload;
 
   if(!decoded.id){
     throw new ApiError(401, 'Unauthorized: Invalid token');
   }
-  const user = await db.select().from(users).where(eq(users.id, decoded.id));
+  const user = await db.select({
+    id: users.id,
+    email: users.email,
+    name: users.firstName,
+    systemRole: users.systemRole
+  }).from(users).where(eq(users.id, decoded.id));
   if(user.length === 0){
     throw new ApiError(401, 'Unauthorized: User for this token no longer exists');
   }
-const {password: _, ...userWithoutPassword} = user[0];
-req.user = userWithoutPassword;
+
+req.user = user[0];
 next();
 
 

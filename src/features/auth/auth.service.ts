@@ -95,12 +95,12 @@ class AuthService{
             id: user.id,
             email: user.email,
             name: user.name,
-            role: user.systemRole
+            systemRole: user.systemRole
         }
         const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, {expiresIn: process.env.JWT_EXPIRY!});
 
         return {
-            accessToken, unHashedToken, user: payload
+            accessToken, refreshToken:unHashedToken, user: payload
         }
 
     }
@@ -148,7 +148,7 @@ class AuthService{
         const payload = {
             id: user.id,
             email: user.email,
-            role: user.systemRole,
+            systemRole: user.systemRole,
             name: user.firstName
         }
 
@@ -158,7 +158,7 @@ class AuthService{
             }
         )
 
-        return {accessToken, newRawToken, newHashedToken}
+        return {accessToken, refreshToken: newRawToken}
     }
 
     async logout(refreshToken: string){

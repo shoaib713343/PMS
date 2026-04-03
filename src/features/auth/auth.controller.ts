@@ -20,8 +20,8 @@ export async function register(req: Request, res: Response) {
 }
 
 export async function login(req: Request, res: Response) {
-    const {accessToken, unHashedToken, user} = await authService.login(req.body);
-   res.cookie("refreshToken", unHashedToken, {
+    const {accessToken, refreshToken, user} = await authService.login(req.body);
+   res.cookie("refreshToken", refreshToken, {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "strict",
@@ -54,12 +54,12 @@ export async function logout(req: Request, res: Response) {
 }
 
 export async function refresh(req: Request, res: Response) {
-    const refreshToken = req.cookies.refreshToken;
-    if(!refreshToken){
+    const token = req.cookies.refreshToken;
+    if(!token){
         throw new ApiError(401, "Missing refresh Token")
     }
-    const {accessToken, newHashedToken, newRawToken} = await authService.refresh(req.cookies.refreshToken);
-    res.cookie("refreshToken", newRawToken, {
+    const {accessToken, refreshToken} = await authService.refresh(token);
+    res.cookie("refreshToken", refreshToken, {
         httpOnly: true,
         secure: process.env.node === "production",
         sameSite: 'strict',

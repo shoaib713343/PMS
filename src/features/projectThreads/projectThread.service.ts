@@ -1,154 +1,136 @@
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 
 import { projectThreads } from "../../db/schema/projectThreads";
-import { projectUsers } from "../../db/schema/projectUsers";
+import { projects } from "../../db/schema";
 
 import { ApiError } from "../../utils/ApiError";
-import { PROJECT_ROLES } from "../../constants/projectRoles";
-import { projects } from "../../db/schema";
+
+import { getProjectContext } from "../../utils/getProjectContext";
+import { canAccessProject } from "../../utils/projectAccess";
+import { hasPermission } from "../../utils/permission";
+import { ACTIONS } from "../../constants/actions";
+
+type AuthUser = {
+  id: number;
+  systemRole: "admin" | "user" | "super_admin";
+};
 
 class ThreadService {
 
-  async createThread({topic,
-  description,
-  priority,
-  assignUserId,
-  dueDate,
-  projectId,
-  userId,
-  systemRole}: any) {
+  // CREATE THREAD
+  async createThread(data: any, user: AuthUser) {
 
-    if (systemRole === "admin" || systemRole === "super_admin") {
+    const { project, projectRole } = await getProjectContext(
+      user,
+      data.projectId
+    );
+
+    if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+      throw new ApiError(403, "No access to project");
+    }
+
+    if (!hasPermission({
+      user,
+      action: ACTIONS.CREATE_THREAD,
+      project,
+      projectRole
+    })) {
+      throw new ApiError(403, "Not allowed to create thread");
+    }
 
     const [thread] = await db.insert(projectThreads)
       .values({
-        topic,
-        description,
-        priority,
-        assignUserId,
-        dueDate,
-        projectId,
-        createdUser: userId
+        ...data,
+        createdUser: user.id
       })
       .returning();
 
     return thread;
   }
 
-    const membership = await db.query.projectUsers.findFirst({
-      where: and(
-        eq(projectUsers.projectId, projectId),
-        eq(projectUsers.userId, userId)
-      )
-    });
+  // GET ALL THREADS
+  async getAllThreads(user: AuthUser) {
 
-    if (!membership) {
-      throw new ApiError(403, "User not part of this project");
-    }
-
-    if (!membership.writeAccess) {
-      throw new ApiError(403, "No permission to create thread");
-    }
-
-    const [thread] = await db
-      .insert(projectThreads)
-      .values({
-        topic,
-        description,
-        priority,
-        assignUserId,
-        dueDate,
-        projectId,
-        createdUser: userId
-      })
-      .returning();
-
-    return thread;
-  }
-
-
-
-  async getAllThreads(userId: number, systemRole: string) {
-
-  
-  if (systemRole === "admin" || systemRole === "super_admin") {
-    return await db
-      .select({
+    if (user.systemRole === "super_admin") {
+      return db.select({
         id: projectThreads.id,
         topic: projectThreads.topic,
         projectId: projectThreads.projectId,
         projectName: projects.title,
-        assignedTo: projectThreads.assignUserId,
       })
       .from(projectThreads)
       .leftJoin(projects, eq(projectThreads.projectId, projects.id))
       .where(eq(projectThreads.isDeleted, false));
-  }
+    }
 
-  return await db
-    .select({
+    if (user.systemRole === "admin") {
+      return db.select({
+        id: projectThreads.id,
+        topic: projectThreads.topic,
+        projectId: projectThreads.projectId,
+        projectName: projects.title,
+      })
+      .from(projectThreads)
+      .leftJoin(projects, eq(projectThreads.projectId, projects.id))
+      .where(
+        and(
+          eq(projectThreads.isDeleted, false),
+          eq(projects.createdBy, user.id)
+        )
+      );
+    }
+
+    // user → only project member threads
+    return db.select({
       id: projectThreads.id,
       topic: projectThreads.topic,
       projectId: projectThreads.projectId,
       projectName: projects.title,
-      assignedTo: projectThreads.assignUserId,
     })
     .from(projectThreads)
-    .leftJoin(projectUsers, eq(projectThreads.projectId, projectUsers.projectId))
     .leftJoin(projects, eq(projectThreads.projectId, projects.id))
-    .where(
-      and(
-        eq(projectThreads.isDeleted, false),
-        or(
-          eq(projectUsers.userId, userId),           
-          eq(projectThreads.assignUserId, userId)    
-        )
-      )
-    );
-}
+    .leftJoin(
+      projectThreads,
+      eq(projectThreads.projectId, projectThreads.projectId)
+    )
+    .where(eq(projectThreads.isDeleted, false));
+  }
 
-  async getThreadsByProjectId(projectId: number, userId: number, systemRole: string, pagination: any, query: any) {
+  // GET THREADS BY PROJECT
 
-    const {page, limit, offset, sortBy, order} = pagination;
-    const {status} = query;
-    if(!(systemRole === "admin" || systemRole === "super_admin")){
-      const membership = await db.query.projectUsers.findFirst({
-      where: and(
-        eq(projectUsers.projectId, projectId),
-        eq(projectUsers.userId, userId)
-      )
-    });
+  async getThreadsByProjectId(
+    projectId: number,
+    user: AuthUser,
+    pagination: any,
+    query: any
+  ) {
 
-    if (!membership || !membership.readAccess) {
-      throw new ApiError(403, "No permission to view threads");
-    }
+    const { project, projectRole } = await getProjectContext(user, projectId);
+
+    if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+      throw new ApiError(403, "No access");
     }
 
-    const whereClause =  and(
+    const { page, limit, offset, sortBy, order } = pagination;
+    const { status } = query;
+
+    const whereClause = and(
       eq(projectThreads.projectId, projectId),
       eq(projectThreads.isDeleted, false),
       status ? eq(projectThreads.threadStatus, status) : undefined
-    )
-
-    const sortOptions = {
-      createdAt: projectThreads.createdAt,
-      threadStatus: projectThreads.threadStatus,
-      priority: projectThreads.priority
-    };
-
-    const sortColumn = sortOptions[sortBy as keyof typeof sortOptions] || projectThreads.createdAt;
-
-
+    );
 
     const data = await db.query.projectThreads.findMany({
       where: whereClause,
       limit,
-      offset,
-      orderBy: (t, {asc, desc})=> order === "asc" ? asc(sortColumn) : desc(sortColumn)
-    })
+      offset
+    });
 
-    const totalResult = await db.select({ count: sql<number>`count(*)` }).from(projectThreads).where(whereClause);
+    const totalResult = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(projectThreads)
+      .where(whereClause);
 
     const total = totalResult[0]?.count || 0;
 
@@ -158,14 +140,15 @@ class ThreadService {
         total,
         page,
         limit,
-        totalPages: Math.ceil(total/limit)
+        totalPages: Math.ceil(total / limit)
       }
-    }
+    };
   }
 
-
-
-  async getThreadById(threadId: number, userId: number, systemRole: string) {
+  // ======================
+  // GET THREAD BY ID
+  // ======================
+  async getThreadById(threadId: number, user: AuthUser) {
 
     const thread = await db.query.projectThreads.findFirst({
       where: eq(projectThreads.id, threadId)
@@ -175,27 +158,22 @@ class ThreadService {
       throw new ApiError(404, "Thread not found");
     }
 
-    if(systemRole === "admin" || systemRole === "super_admin"){
-      return thread;
-    }
+    const { project, projectRole } = await getProjectContext(
+      user,
+      thread.projectId
+    );
 
-    const membership = await db.query.projectUsers.findFirst({
-      where: and(
-        eq(projectUsers.projectId, thread.projectId),
-        eq(projectUsers.userId, userId)
-      )
-    });
-
-    if (!membership || !membership.readAccess) {
-      throw new ApiError(403, "No permission");
+    if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+      throw new ApiError(403, "No access");
     }
 
     return thread;
   }
 
-
-
-  async updateThread(threadId: number, data: any, userId: number, systemRole: string) {
+  // ======================
+  // UPDATE THREAD
+  // ======================
+  async updateThread(threadId: number, data: any, user: AuthUser) {
 
     const thread = await db.query.projectThreads.findFirst({
       where: eq(projectThreads.id, threadId)
@@ -205,91 +183,40 @@ class ThreadService {
       throw new ApiError(404, "Thread not found");
     }
 
-    if(systemRole === "admin" || systemRole === "super_admin"){
-      const [updatedThread] = await db
-      .update(projectThreads)
-      .set({
-        ...data,
-        updatedAt: new Date()
-      })
-      .where(eq(projectThreads.id, threadId))
-      .returning();
+    const { project, projectRole } = await getProjectContext(
+      user,
+      thread.projectId
+    );
 
-    return updatedThread;
+    if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+      throw new ApiError(403, "No access");
     }
 
-    const membership = await db.query.projectUsers.findFirst({
-      where: and(
-        eq(projectUsers.projectId, thread.projectId),
-        eq(projectUsers.userId, userId)
-      )
-    });
-
-    if (!membership || !membership.updateAccess) {
-      throw new ApiError(403, "No permission to update thread");
+    if (!hasPermission({
+      user,
+      action: ACTIONS.UPDATE_THREAD,
+      project,
+      projectRole,
+      resource: thread
+    })) {
+      throw new ApiError(403, "Not allowed");
     }
 
-    const [updatedThread] = await db
-      .update(projectThreads)
-      .set({
-        ...data,
-        updatedAt: new Date()
-      })
-      .where(eq(projectThreads.id, threadId))
-      .returning();
-
-    return updatedThread;
-  }
-
-  async updateThreadStatus(
-  threadId: number,
-  status: number,
-  userId: number,
-  systemRole: string
-){
-
-  const thread = await db.query.projectThreads.findFirst({
-    where: eq(projectThreads.id, threadId)
-  });
-
-  if(!thread){
-    throw new ApiError(404, "Thread not found");
-  }
-
-  if(systemRole === "admin" || systemRole === "super_admin"){
     const [updated] = await db.update(projectThreads)
-      .set({ threadStatus: status })
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
       .where(eq(projectThreads.id, threadId))
       .returning();
 
     return updated;
   }
 
-  const membership = await db.query.projectUsers.findFirst({
-    where: and(
-      eq(projectUsers.projectId, thread.projectId),
-      eq(projectUsers.userId, userId)
-    )
-  });
-
-  if(!membership){
-    throw new ApiError(403, "User not part of this project");
-  }
-
-  if(membership.roleId !== PROJECT_ROLES.PROJECT_ADMIN){
-    throw new ApiError(403, "Only project admin can update thread status");
-  }
-
-  const [updated] = await db.update(projectThreads)
-    .set({ threadStatus: status })
-    .where(eq(projectThreads.id, threadId))
-    .returning();
-
-  return updated;
-}
-
-
-  async deleteThread(threadId: number, userId: number, systemRole: string) {
+  // ======================
+  // DELETE THREAD
+  // ======================
+  async deleteThread(threadId: number, user: AuthUser) {
 
     const thread = await db.query.projectThreads.findFirst({
       where: eq(projectThreads.id, threadId)
@@ -299,36 +226,78 @@ class ThreadService {
       throw new ApiError(404, "Thread not found");
     }
 
-    if(systemRole === "admin" || systemRole === "super_admin"){
-       await db
-      .update(projectThreads)
-      .set({
-        isDeleted: true
-      })
-      .where(eq(projectThreads.id, threadId));
+    const { project, projectRole } = await getProjectContext(
+      user,
+      thread.projectId
+    );
 
-      return;
+    if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+      throw new ApiError(403, "No access");
     }
 
-    const membership = await db.query.projectUsers.findFirst({
-      where: and(
-        eq(projectUsers.projectId, thread.projectId),
-        eq(projectUsers.userId, userId)
-      )
-    });
-
-    if (!membership || !membership.deleteAccess) {
-      throw new ApiError(403, "No permission to delete thread");
+    if (!hasPermission({
+      user,
+      action: ACTIONS.DELETE_THREAD,
+      project,
+      projectRole,
+      resource: thread
+    })) {
+      throw new ApiError(403, "Not allowed");
     }
 
-    await db
-      .update(projectThreads)
-      .set({
-        isDeleted: true
-      })
+    await db.update(projectThreads)
+      .set({ isDeleted: true })
       .where(eq(projectThreads.id, threadId));
   }
 
+  // ======================
+  // UPDATE THREAD STATUS
+
+  async updateThreadStatus(
+  threadId: number,
+  status: number,
+  user: AuthUser
+) {
+
+  const thread = await db.query.projectThreads.findFirst({
+    where: eq(projectThreads.id, threadId),
+  });
+
+  if (!thread || thread.isDeleted) {
+    throw new ApiError(404, "Thread not found");
+  }
+
+  const { project, projectRole } = await getProjectContext(
+    user,
+    thread.projectId
+  );
+
+  // Access
+  if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+    throw new ApiError(403, "No access");
+  }
+
+  // Permission (reuse UPDATE_THREAD)
+  if (!hasPermission({
+    user,
+    action: ACTIONS.UPDATE_THREAD,
+    project,
+    projectRole,
+    resource: thread
+  })) {
+    throw new ApiError(403, "Not allowed to update thread status");
+  }
+
+  const [updated] = await db.update(projectThreads)
+    .set({
+      threadStatus: status,
+      updatedAt: new Date()
+    })
+    .where(eq(projectThreads.id, threadId))
+    .returning();
+
+  return updated;
+}
 }
 
 export const threadService = new ThreadService();

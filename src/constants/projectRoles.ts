@@ -1,6 +1,4 @@
 export const PROJECT_ROLES = {
-  PROJECT_ADMIN: 1,
-  DEVELOPER: 2,
-  TESTER: 3,
-  VIEWER: 4
+  1: "project_admin",
+  2: "member",
 };

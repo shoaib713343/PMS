@@ -1,301 +1,180 @@
-import {
-  and,
-  eq,
-  or,
-  asc,
-  desc,
-  count,
-  exists,
-} from "drizzle-orm";
-
+import { and, eq, asc, desc, count, sql } from "drizzle-orm";
 import { db } from "../../db";
+
 import { projectThreads } from "../../db/schema/projectThreads";
 import { tasks } from "../../db/schema/tasks";
-import { projectUsers } from "../../db/schema";
 import { taskAssignees } from "../../db/schema/taskAssignees";
+
 import { ApiError } from "../../utils/ApiError";
-import { PROJECT_ROLES } from "../../constants/projectRoles";
-import { logActivity} from "../activity/activity.service";
+
+import { getProjectContext } from "../../utils/getProjectContext";
+import { canAccessProject } from "../../utils/projectAccess";
+import { hasPermission } from "../../utils/permission";
+import { ACTIONS } from "../../constants/actions";
+
+import { logActivity } from "../activity/activity.service";
+import { projects } from "../../db/schema";
+
+type AuthUser = {
+  id: number;
+  systemRole: "admin" | "user" | "super_admin";
+};
 
 class TaskService {
 
-  async createTask(options: any) {
-    const {
-      threadId,
-      title,
-      description,
-      gitLink,
-      targetDate,
-      userId,
-      systemRole,
-      assignedUserIds,
-    } = options;
+  // CREATE TASK
+  
+  async createTask(options: any, user: AuthUser) {
 
     const thread = await db.query.projectThreads.findFirst({
-      where: eq(projectThreads.id, threadId),
+      where: eq(projectThreads.id, options.threadId),
     });
 
     if (!thread || thread.isDeleted) {
       throw new ApiError(404, "Thread not found");
     }
 
-    if (thread.threadStatus === 4) {
-      throw new ApiError(400, "Thread is closed");
+    const { project, projectRole } = await getProjectContext(
+      user,
+      thread.projectId
+    );
+
+    if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+      throw new ApiError(403, "No access");
     }
 
-    if (!(systemRole === "admin" || systemRole === "super_admin")) {
-      const membership = await db.query.projectUsers.findFirst({
-        where: and(
-          eq(projectUsers.projectId, thread.projectId),
-          eq(projectUsers.userId, userId)
-        ),
-      });
-
-      if (!membership) {
-        throw new ApiError(403, "You are not a member of this project");
-      }
-
-      if (membership.roleId !== PROJECT_ROLES.PROJECT_ADMIN) {
-        throw new ApiError(403, "Only project admin can create tasks");
-      }
+    if (!hasPermission({
+      user,
+      action: ACTIONS.CREATE_TASK,
+      project,
+      projectRole
+    })) {
+      throw new ApiError(403, "Not allowed to create task");
     }
 
     return db.transaction(async (tx) => {
+
       const [task] = await tx.insert(tasks).values({
-        threadId,
-        title,
-        description,
-        gitLink,
-        targetDate,
-        createdUser: userId,
+        threadId: options.threadId,
+        title: options.title,
+        description: options.description,
+        gitLink: options.gitLink,
+        targetDate: options.targetDate,
+        createdUser: user.id,
       }).returning();
 
-      if (assignedUserIds?.length) {
+      if (options.assignedUserIds?.length) {
         await tx.insert(taskAssignees).values(
-          assignedUserIds.map((uId: number) => ({
+          options.assignedUserIds.map((uId: number) => ({
             taskId: task.id,
             userId: uId,
           }))
         );
       }
 
-       await logActivity({
-    userId,
-    action: "TASK_CREATED",
-    entity: "TASK",
-    entityId: task.id,
-    projectId: thread.projectId,
-    metadata: {
-      title: task.title,
-      threadId: thread.id
-    },
-  });
-
-      return task;
-    });
-  }
-
-  async assignUsersToTask(taskId: number, userIds: number[]) {
-    if (!userIds?.length) {
-      throw new ApiError(400, "User IDs required");
-    }
-
-    const task = await db.query.tasks.findFirst({
-      where: eq(tasks.id, taskId),
-    });
-
-    if (!task || task.isDeleted) {
-      throw new ApiError(404, "Task not found");
-    }
-
-    await db.delete(taskAssignees)
-      .where(eq(taskAssignees.taskId, taskId));
-
-    await db.insert(taskAssignees).values(
-      userIds.map((userId) => ({
-        taskId,
-        userId,
-      }))
-    );
-
-    return true;
-  }
-
-  async removeUserFromTask(taskId: number, userId: number) {
-    await db.delete(taskAssignees).where(
-      and(
-        eq(taskAssignees.taskId, taskId),
-        eq(taskAssignees.userId, userId)
-      )
-    );
-
-    return true;
-  }
-
-  async getTasksForUser(userId: number, systemRole: string, pagination: any) {
-    const {
-      page = 1,
-      limit = 10,
-      sortBy = "createdAt",
-      order = "desc",
-    } = pagination;
-
-    const safeLimit = Math.min(limit, 50);
-    const offset = (page - 1) * safeLimit;
-
-    const isAdmin =
-      systemRole === "admin" || systemRole === "super_admin";
-
-    const sortOptions = {
-      createdAt: tasks.createdAt,
-      title: tasks.title,
-      targetDate: tasks.targetDate,
-      taskStatus: tasks.taskStatus,
-    };
-
-    const sortColumn =
-      sortOptions[sortBy as keyof typeof sortOptions] ||
-      tasks.createdAt;
-
-    const assignmentFilter = exists(
-      db
-        .select()
-        .from(taskAssignees)
-        .where(
-          and(
-            eq(taskAssignees.taskId, tasks.id),
-            eq(taskAssignees.userId, userId)
-          )
-        )
-    );
-
-    const projectAccessFilter = exists(
-      db
-        .select()
-        .from(projectThreads)
-        .innerJoin(
-          projectUsers,
-          eq(projectUsers.projectId, projectThreads.projectId)
-        )
-        .where(
-          and(
-            eq(projectThreads.id, tasks.threadId),
-            eq(projectUsers.userId, userId)
-          )
-        )
-    );
-
-    const userFilter = or(assignmentFilter, projectAccessFilter);
-
-    const baseCondition = isAdmin
-      ? eq(tasks.isDeleted, false)
-      : and(eq(tasks.isDeleted, false), userFilter);
-
-    const data = await db
-      .select()
-      .from(tasks)
-      .where(baseCondition)
-      .orderBy(order === "asc" ? asc(sortColumn) : desc(sortColumn))
-      .limit(safeLimit)
-      .offset(offset);
-
-    const [{ total }] = await db
-      .select({ total: count() })
-      .from(tasks)
-      .where(baseCondition);
-
-    return {
-      data,
-      pagination: {
-        total,
-        page,
-        limit: safeLimit,
-        totalPages: Math.ceil(total / safeLimit),
-      },
-    };
-  }
-
-  async getThreadTasksService(
-    threadId: number,
-    userId: number,
-    systemRole: string,
-    pagination: any,
-    query: any
-  ) {
-    const {
-      page = 1,
-      limit = 10,
-      sortBy = "createdAt",
-      order = "desc",
-    } = pagination;
-
-    const { status } = query;
-
-    const safeLimit = Math.min(limit, 50);
-    const offset = (page - 1) * safeLimit;
-
-    const thread = await db.query.projectThreads.findFirst({
-      where: eq(projectThreads.id, threadId),
-    });
-
-    if (!thread) {
-      throw new ApiError(404, "Thread not found");
-    }
-
-    if (!(systemRole === "admin" || systemRole === "super_admin")) {
-      const membership = await db.query.projectUsers.findFirst({
-        where: and(
-          eq(projectUsers.projectId, thread.projectId),
-          eq(projectUsers.userId, userId)
-        ),
+      await logActivity({
+        userId: user.id,
+        action: "TASK_CREATED",
+        entity: "TASK",
+        entityId: task.id,
+        projectId: thread.projectId,
       });
 
-      if (!membership || !membership.readAccess) {
-        throw new ApiError(403, "No permission to view tasks");
-      }
-    }
-
-    const sortOptions = {
-      createdAt: tasks.createdAt,
-      taskStatus: tasks.taskStatus,
-      title: tasks.title,
-    };
-
-    const sortColumn =
-      sortOptions[sortBy as keyof typeof sortOptions] ||
-      tasks.createdAt;
-
-    const whereClause = and(
-      eq(tasks.threadId, threadId),
-      eq(tasks.isDeleted, false),
-      status ? eq(tasks.taskStatus, status) : undefined
-    );
-
-    const data = await db
-      .select()
-      .from(tasks)
-      .where(whereClause)
-      .orderBy(order === "asc" ? asc(sortColumn) : desc(sortColumn))
-      .limit(safeLimit)
-      .offset(offset);
-
-    const [{ total }] = await db
-      .select({ total: count() })
-      .from(tasks)
-      .where(whereClause);
-
-    return {
-      data,
-      pagination: {
-        total,
-        page,
-        limit: safeLimit,
-        totalPages: Math.ceil(total / safeLimit),
-      },
-    };
+      return task;
+    });
   }
 
-  async getTaskByIdService(taskId: number, userId: number, systemRole: string) {
+  async getTasksForUser(
+  user: AuthUser,
+  pagination: {
+    page: number;
+    limit: number;
+    sortBy?: string;
+    order?: string;
+  }
+) {
+  const { page, limit } = pagination;
+  const offset = (page - 1) * limit;
+
+  const baseSelect = {
+    id: tasks.id,
+    title: tasks.title,
+    description: tasks.description,
+    status: tasks.taskStatus,
+    threadId: tasks.threadId,
+  };
+
+  let query;
+  let whereClause;
+
+  // super_admin → all tasks
+  if (user.systemRole === "super_admin") {
+    query = db.select(baseSelect).from(tasks);
+    whereClause = eq(tasks.isDeleted, false);
+  }
+
+  // admin → only tasks from own projects
+  else if (user.systemRole === "admin") {
+    query = db
+      .select(baseSelect)
+      .from(tasks)
+      .innerJoin(projectThreads, eq(tasks.threadId, projectThreads.id))
+      .innerJoin(projects, eq(projectThreads.projectId, projects.id));
+    
+    whereClause = and(
+      eq(projects.createdBy, user.id),
+      eq(tasks.isDeleted, false)
+    );
+  }
+
+  // user → only assigned tasks
+  else {
+    query = db
+      .select(baseSelect)
+      .from(tasks)
+      .innerJoin(taskAssignees, eq(tasks.id, taskAssignees.taskId));
+    
+    whereClause = and(
+      eq(taskAssignees.userId, user.id),
+      eq(tasks.isDeleted, false)
+    );
+  }
+
+  // Execute the main query
+  const data = await query
+    .where(whereClause)
+    .limit(limit)
+    .offset(offset);
+
+  // Get total count for pagination
+  const countResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(tasks)
+    .innerJoin(
+      user.systemRole === "admin" ? projectThreads : 
+      user.systemRole === "user" ? taskAssignees : sql``,
+      user.systemRole === "admin" ? eq(tasks.threadId, projectThreads.id) :
+      user.systemRole === "user" ? eq(tasks.id, taskAssignees.taskId) : sql``
+    )
+    .where(whereClause);
+
+  const total = Number(countResult[0]?.count) || 0;
+
+  return {
+    data,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
+}
+  
+  // GET TASK BY ID
+  
+  async getTaskById(taskId: number, user: AuthUser) {
+
     const task = await db.query.tasks.findFirst({
       where: eq(tasks.id, taskId),
     });
@@ -304,44 +183,115 @@ class TaskService {
       throw new ApiError(404, "Task not found");
     }
 
-
-    if (systemRole === "admin" || systemRole === "super_admin") {
-      return task;
-    }
-
     const thread = await db.query.projectThreads.findFirst({
-      where: eq(projectThreads.id, task?.threadId),
+      where: eq(projectThreads.id, task.threadId),
     });
 
-    if (!thread) {
-      throw new ApiError(404, "Thread not found");
-    }
+    const { project, projectRole } = await getProjectContext(
+      user,
+      thread!.projectId
+    );
 
-    const membership = await db.query.projectUsers.findFirst({
-      where: and(
-        eq(projectUsers.projectId, thread.projectId),
-        eq(projectUsers.userId, userId)
-      ),
-    });
-
-    if (!membership || !membership.readAccess) {
-      throw new ApiError(403, "No permission");
+    if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+      throw new ApiError(403, "No access");
     }
 
     return task;
   }
 
-  async updateTask(
-    title: string,
-    description: string,
-    gitLink: string,
-    targetDate: any,
-    userId: number,
-    systemRole: string,
-    taskId: number,
-    status?: string
-  ) {
+async getThreadTasksService(
+  threadId: number,
+  user: AuthUser,
+  pagination: {
+    page: number;
+    limit: number;
+    sortBy?: string;
+    order?: string;
+  },
+  query?: any
+) {
+  const { page, limit, sortBy, order } = pagination;
+  const offset = (page - 1) * limit;
+
+  // 1️⃣ Get thread with access check
+  const thread = await db.query.projectThreads.findFirst({
+    where: eq(projectThreads.id, threadId),
+  });
+
+  if (!thread || thread.isDeleted) {
+    throw new ApiError(404, "Thread not found");
+  }
+
+  // 2️⃣ Project context & access check
+  const { project, projectRole } = await getProjectContext(user, thread.projectId);
+  
+  if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+    throw new ApiError(403, "No access");
+  }
+
+  const selectFields = {
+    id: tasks.id,
+    title: tasks.title,
+    description: tasks.description,
+    status: tasks.taskStatus,
+    createdUser: tasks.createdUser,
+  };
+
+  // Build where clause
+  const whereConditions = [eq(tasks.threadId, threadId), eq(tasks.isDeleted, false)];
+  if (user.systemRole === "user") {
+    whereConditions.push(eq(taskAssignees.userId, user.id));
+  }
+  const whereClause = and(...whereConditions);
+
+  // Build main query
+  let mainQuery: any = db.select(selectFields).from(tasks);
+  if (user.systemRole === "user") {
+    mainQuery = mainQuery.innerJoin(taskAssignees, eq(tasks.id, taskAssignees.taskId));
+  }
+
+  // Add sorting with explicit column mapping
+  if (sortBy && order) {
+    // Create a mapping of sortable fields to actual columns
+    const sortableColumns: Record<string, any> = {
+      id: tasks.id,
+      title: tasks.title,
+      status: tasks.taskStatus,
+      createdUser: tasks.createdUser,
+    };
     
+    const column = sortableColumns[sortBy];
+    if (column) {
+      mainQuery = mainQuery.orderBy(order === 'desc' ? desc(column) : asc(column));
+    }
+  }
+
+  // Build count query
+  let countQuery: any = db.select({ count: count() }).from(tasks);
+  if (user.systemRole === "user") {
+    countQuery = countQuery.innerJoin(taskAssignees, eq(tasks.id, taskAssignees.taskId));
+  }
+
+  // Execute queries
+  const [data, countResult] = await Promise.all([
+    mainQuery.where(whereClause).limit(limit).offset(offset),
+    countQuery.where(whereClause)
+  ]);
+
+  return {
+    data,
+    pagination: {
+      page,
+      limit,
+      total: Number(countResult[0]?.count) || 0,
+      totalPages: Math.ceil((Number(countResult[0]?.count) || 0) / limit)
+    }
+  };
+}
+  
+  // UPDATE TASK
+  
+  async updateTask(taskId: number, data: any, user: AuthUser) {
 
     const task = await db.query.tasks.findFirst({
       where: eq(tasks.id, taskId),
@@ -355,123 +305,107 @@ class TaskService {
       where: eq(projectThreads.id, task.threadId),
     });
 
-    if (!task || task.isDeleted) {
-      throw new ApiError(404, "Task not found");
+    const { project, projectRole } = await getProjectContext(
+      user,
+      thread!.projectId
+    );
+
+    if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+      throw new ApiError(403, "No access");
     }
 
-    if (systemRole === "admin" || systemRole === "super_admin") {
-     const updatedTask = await db.update(tasks)
-  .set({ title, description, gitLink, targetDate, updatedAt: new Date(), taskStatus: status })
-  .where(eq(tasks.id, taskId))
-  .returning();
-
-await logActivity({
-  userId,
-  action: "TASK_UPDATED",
-  entity: "TASK",
-  entityId: taskId,
-  projectId: thread!.projectId
-});
-
-return updatedTask;
+    if (!hasPermission({
+      user,
+      action: ACTIONS.UPDATE_TASK,
+      project,
+      projectRole,
+      resource: task
+    })) {
+      throw new ApiError(403, "Not allowed");
     }
 
-    
+    const [updated] = await db.update(tasks)
+      .set({
+        ...data,
+        updatedAt: new Date()
+      })
+      .where(eq(tasks.id, taskId))
+      .returning();
 
-    const membership = await db.query.projectUsers.findFirst({
-      where: and(
-        eq(projectUsers.projectId, thread!.projectId),
-        eq(projectUsers.userId, userId)
-      ),
+    await logActivity({
+      userId: user.id,
+      action: "TASK_UPDATED",
+      entity: "TASK",
+      entityId: taskId,
+      projectId: thread!.projectId
     });
 
-    if (!membership?.updateAccess) {
-      throw new ApiError(403, "User cannot update tasks");
-    }
-
-    const updatedTask = await db.update(tasks)
-  .set({ title, description, gitLink, targetDate, updatedAt: new Date(), taskStatus: status })
-  .where(eq(tasks.id, taskId))
-  .returning();
-
-await logActivity({
-  userId,
-  action: "TASK_UPDATED",
-  entity: "TASK",
-  entityId: taskId,
-  projectId: thread!.projectId
-});
-
-return updatedTask;
+    return updated;
   }
 
   async updateTaskStatus(
-    taskId: number,
-    status: string,
-    userId: number,
-    systemRole: string
-  ) {
-    const task = await db.query.tasks.findFirst({
-      where: eq(tasks.id, taskId),
-    });
+  taskId: number,
+  status: string,
+  user: AuthUser
+) {
 
-    if (!task || task.isDeleted) {
-      throw new ApiError(404, "Task not found");
-    }
+  // 1️⃣ Get task
+  const task = await db.query.tasks.findFirst({
+    where: eq(tasks.id, taskId),
+  });
 
-    const thread = await db.query.projectThreads.findFirst({
-      where: eq(projectThreads.id, task.threadId),
-    });
-
-    if (systemRole === "admin" || systemRole === "super_admin") {
-      const updatedTask = await db.update(tasks)
-  .set({ taskStatus: status, updatedAt: new Date() })
-  .where(eq(tasks.id, taskId))
-  .returning();
-
-await logActivity({
-  userId,
-  action: "TASK_STATUS_UPDATED",
-  entity: "TASK",
-  entityId: taskId,
-  projectId: thread!.projectId,
-  metadata: { status },
-});
-
-return updatedTask;
-    }
-
-    
-
-    const membership = await db.query.projectUsers.findFirst({
-      where: and(
-        eq(projectUsers.projectId, thread!.projectId),
-        eq(projectUsers.userId, userId)
-      ),
-    });
-
-    if (!membership?.updateAccess) {
-      throw new ApiError(403, "User cannot update task status");
-    }
-
-    const updatedTask = await db.update(tasks)
-  .set({ taskStatus: status, updatedAt: new Date() })
-  .where(eq(tasks.id, taskId))
-  .returning();
-
-await logActivity({
-  userId,
-  action: "TASK_STATUS_UPDATED",
-  entity: "TASK",
-  entityId: taskId,
-  projectId: thread!.projectId,
-  metadata: { status },
-});
-
-return updatedTask;
+  if (!task || task.isDeleted) {
+    throw new ApiError(404, "Task not found");
   }
 
-  async deleteTask(taskId: number, userId: number, systemRole: string) {
+  // 2️⃣ Get thread
+  const thread = await db.query.projectThreads.findFirst({
+    where: eq(projectThreads.id, task.threadId),
+  });
+
+  if (!thread) {
+    throw new ApiError(404, "Thread not found");
+  }
+
+  // 3️⃣ Project context
+  const { project, projectRole } = await getProjectContext(
+    user,
+    thread.projectId
+  );
+
+  // 4️⃣ Access
+  if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+    throw new ApiError(403, "No access");
+  }
+
+  // 5️⃣ Permission
+  if (!hasPermission({
+    user,
+    action: ACTIONS.UPDATE_TASK,
+    project,
+    projectRole,
+    resource: task
+  })) {
+    throw new ApiError(403, "Not allowed to update task status");
+  }
+
+  // 6️⃣ Update status
+  const [updated] = await db.update(tasks)
+    .set({
+      taskStatus: status,
+      updatedAt: new Date()
+    })
+    .where(eq(tasks.id, taskId))
+    .returning();
+
+  return updated;
+}
+
+  
+  // DELETE TASK
+  
+  async deleteTask(taskId: number, user: AuthUser) {
+
     const task = await db.query.tasks.findFirst({
       where: eq(tasks.id, taskId),
     });
@@ -480,54 +414,42 @@ return updatedTask;
       throw new ApiError(404, "Task not found");
     }
 
-    if (systemRole === "admin" || systemRole === "super_admin") {
-const thread = await db.query.projectThreads.findFirst({
-  where: eq(projectThreads.id, task.threadId),
-});
-
-await db.update(tasks)
-  .set({ isDeleted: true })
-  .where(eq(tasks.id, taskId));
-
-await logActivity({
-  userId,
-  action: "TASK_DELETED",
-  entity: "TASK",
-  entityId: taskId,
-  projectId: thread!.projectId
-});
-
-      return { success: true };
-    }
-
     const thread = await db.query.projectThreads.findFirst({
       where: eq(projectThreads.id, task.threadId),
     });
 
-    const membership = await db.query.projectUsers.findFirst({
-      where: and(
-        eq(projectUsers.projectId, thread!.projectId),
-        eq(projectUsers.userId, userId)
-      ),
-    });
+    const { project, projectRole } = await getProjectContext(
+      user,
+      thread!.projectId
+    );
 
-    if (!membership?.deleteAccess) {
-      throw new ApiError(403, "User cannot delete tasks");
+    if (!canAccessProject(user,{ ...project, createdBy: project.createdBy! }, projectRole)) {
+      throw new ApiError(403, "No access");
+    }
+
+    if (!hasPermission({
+      user,
+      action: ACTIONS.DELETE_TASK,
+      project,
+      projectRole,
+      resource: task
+    })) {
+      throw new ApiError(403, "Not allowed");
     }
 
     await db.update(tasks)
-  .set({ isDeleted: true })
-  .where(eq(tasks.id, taskId));
+      .set({ isDeleted: true })
+      .where(eq(tasks.id, taskId));
 
-await logActivity({
-  userId,
-  action: "TASK_DELETED",
-  entity: "TASK",
-  entityId: taskId,
-  projectId: thread!.projectId,
-});
+    await logActivity({
+      userId: user.id,
+      action: "TASK_DELETED",
+      entity: "TASK",
+      entityId: taskId,
+      projectId: thread!.projectId
+    });
 
-return { success: true };
+    return { success: true };
   }
 }
 

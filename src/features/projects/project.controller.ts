@@ -40,10 +40,8 @@ export const listProjectsController = async (req: Request, res: Response) => {
   const pagination = getPagination(req.query);
 
   const projects = await projectService.listProjects(
-    Number(user.id),
-    user.systemRole,
-    pagination,
-    req.query
+    user,
+    pagination
   );
 
   res.status(200).json({
@@ -62,8 +60,7 @@ export const getProjectDetailsController = async (
 
   const project = await projectService.getProjectDetails(
     Number(projectId),
-    Number(user.id),
-    user.systemRole
+    user
   );
 
   res.status(200).json({
@@ -78,13 +75,12 @@ export const updateProjectController = async (
 ) => {
   const  projectId  = req.params.projectId;
   const { title, description } = req.body;
-  const userId = req.user?.id;
+  const user = req.user!;
   const systemRole = req.user?.systemRole!;
 
   const updated = await projectService.updateProject(
     Number(projectId),
-    Number(userId),
-    systemRole,
+    user,
     {
       title,
       description,
@@ -104,7 +100,7 @@ export const deleteProjectController = async (
   const { projectId } = req.params;
   const user = req.user!;
 
-  await projectService.deleteProject(Number(projectId), Number(user.id), user.systemRole);
+  await projectService.deleteProject(Number(projectId), user);
 
   res.status(200).json({
     success: true,
@@ -122,7 +118,6 @@ export async function assignProjectMember(req: Request, res: Response) {
     throw new ApiError(401, "Unauthorized");
   }
 
-  // 🔥 FIX 1: Use correct field (role instead of systemRole)
   if (
     currentUser.systemRole !== "admin" &&
     currentUser.systemRole !== "super_admin"
@@ -144,11 +139,12 @@ export async function assignProjectMember(req: Request, res: Response) {
     throw new ApiError(400, "roleName is required");
   }
 
-  await projectService.assignUserToProject({
+  await projectService.assignUserToProject(
     projectId,
-    userId: parsedUserId,
+    parsedUserId,
     roleName,
-  });
+    currentUser
+  );
 
   res.status(200).json({
     message: "User assigned successfully",
@@ -166,7 +162,7 @@ export const removeProjectMemberController = async (
   await projectService.removeProjectMember(
     Number(projectId),
     Number(userId),
-    currentUser.systemRole
+    currentUser
   );
 
   res.status(200).json({

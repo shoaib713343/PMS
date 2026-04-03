@@ -6,11 +6,9 @@ import { ApiError } from "../../utils/ApiError";
 export async function createMessageController(req: Request, res: Response){
     const message = await messageService.createMessage({
         threadId: Number(req.params.threadId),
-        userId: Number(req.user?.id),
-        systemRole: req.user?.systemRole ?? "",
         content : req.body.content,
         parentId: req.body.parentId
-    });
+    }, req.user!);
 
     return res.status(201).json(
         new ApiResponse(
@@ -22,22 +20,16 @@ export async function createMessageController(req: Request, res: Response){
 }
 
 export const replyToMessage = async (req: Request, res: Response) => {
-  const threadId = Number(req.params.threadId);
-  const parentId = Number(req.params.messageId);
-  const userId = Number(req.user?.id);
-  const systemRole = req.user?.systemRole || "";
 
   if (!req.body.content) {
     throw new ApiError(400, "Content is required");
   }
 
   const reply = await messageService.createMessage({
-    threadId,
-    userId,
-    content: req.body.content,
-    parentId,
-    systemRole,
-  });
+        threadId: Number(req.params.threadId),
+        content : req.body.content,
+        parentId: req.body.parentId
+    }, req.user!);
 
   res.status(201).json({
     success: true,
@@ -47,17 +39,27 @@ export const replyToMessage = async (req: Request, res: Response) => {
 
 export const getMessages = async (req: Request, res: Response) => {
   const threadId = Number(req.params.threadId);
-  const userId = Number(req.user?.id);
-  const systemRole = req.user?.systemRole || "";
 
-  const messages = await messageService.getBythread(
+  const messages = await messageService.getByThread(
     threadId,
-    userId,
-    systemRole
+    req.user!
   );
 
   res.status(200).json({
     success: true,
     data: messages,
   });
+};
+
+export const deleteMessage = async (req: Request, res: Response) => {
+  const messageId = Number(req.params.messageId);
+
+  await messageService.deleteMessage(messageId, req.user!);
+
+  res.status(200).json(
+    new ApiResponse(
+      200,
+      "Message deleted successfully"
+    )
+  );
 };

@@ -1,101 +1,179 @@
 import { and, eq } from "drizzle-orm";
-import { projectUsers } from "../../db/schema";
-import { ApiError } from "../../utils/ApiError";
-import { threadService } from "../projectThreads/projectThread.service";
-import { messages } from "../../db/schema/messages";
 import { db } from "../../db";
 
+import { messages } from "../../db/schema/messages";
+import { projectThreads } from "../../db/schema/projectThreads";
+
+import { ApiError } from "../../utils/ApiError";
+
+import { getProjectContext } from "../../utils/getProjectContext";
+import { canAccessProject } from "../../utils/projectAccess";
+import { hasPermission } from "../../utils/permission";
+import { ACTIONS } from "../../constants/actions";
+
+type AuthUser = {
+  id: number;
+  systemRole: "admin" | "user" | "super_admin";
+};
+
 class MessageService {
-    async createMessage(options: {
-        threadId: number;
-        userId: number;
-        systemRole: string;
-        content: string;
-        parentId?: number;
-    }){
-        const thread = await threadService.getThreadById(options.threadId, options.userId, options.systemRole);
 
-        if(!thread){
-            throw new ApiError(404, "Thread not found");
-        }
+  
+  // CREATE MESSAGE / REPLY
+  
+  async createMessage(options: {
+    threadId: number;
+    content: string;
+    parentId?: number;
+  }, user: AuthUser) {
 
-        if(!(options.systemRole === "admin" || options.systemRole === "super_admin")){
-            const isMember = await db.select().from(projectUsers).where(
-                and(
-                    eq(projectUsers.projectId, thread.projectId),
-                    eq(projectUsers.userId, options.userId)
-                )
-            )
-
-          if(isMember.length === 0){
-            throw new ApiError(403, "You are not a member of this project");
-          }
-            
-        }
-
-        if (options.parentId) {
-  const [parent] = await db
-    .select()
-    .from(messages)
-    .where(eq(messages.id, options.parentId));
-
-  if (!parent || parent.threadId !== options.threadId) {
-    throw new ApiError(400, "Invalid parent message");
-  }
-}
-        const [message] = await db.insert(messages).values({
-            threadId: options.threadId,
-            userId: options.userId,
-            content: options.content,
-            parentId: options.parentId
-        }).returning();
-
-        return message;
-    }
-
-    async getBythread(threadId: number, userId: number, systemRole: string) {
-
-  if (!(systemRole === "admin" || systemRole === "super_admin")) {
-
-    const thread = await threadService.getThreadById(threadId, userId, systemRole);
+    const thread = await db.query.projectThreads.findFirst({
+      where: eq(projectThreads.id, options.threadId),
+    });
 
     if (!thread) {
-      throw new ApiError(404, "Thread not found or access denied");
+      throw new ApiError(404, "Thread not found");
     }
-  }
 
-  const allMessages = await db
-    .select()
-    .from(messages)
-    .where(
-      and(
-        eq(messages.threadId, threadId),
-        eq(messages.isDeleted, false)
-      )
-    )
-    .orderBy(messages.createdAt);
+    const { project, projectRole } = await getProjectContext(
+      user,
+      thread.projectId
+    );
 
-  const parentMessages = allMessages.filter(m => !m.parentId);
-  const replies = allMessages.filter(m => m.parentId);
+    // Access
+    if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+      throw new ApiError(403, "No access");
+    }
 
-  const replyMap = new Map<number, any[]>();
+    // Permission
+    if (!hasPermission({
+      user,
+      action: ACTIONS.SEND_MESSAGE,
+      project,
+      projectRole
+    })) {
+      throw new ApiError(403, "Not allowed to send message");
+    }
 
-  for (const reply of replies) {
-    if (reply.parentId !== null) {
-      if (!replyMap.has(reply.parentId)) {
-        replyMap.set(reply.parentId, []);
+    // Reply validation
+    if (options.parentId) {
+      const [parent] = await db
+        .select()
+        .from(messages)
+        .where(eq(messages.id, options.parentId));
+
+      if (!parent || parent.threadId !== options.threadId) {
+        throw new ApiError(400, "Invalid parent message");
       }
-      replyMap.get(reply.parentId)!.push(reply);
     }
+
+    const [message] = await db.insert(messages)
+      .values({
+        threadId: options.threadId,
+        userId: user.id,
+        content: options.content,
+        parentId: options.parentId
+      })
+      .returning();
+
+    return message;
   }
 
-  const result = parentMessages.map(parent => ({
-    ...parent,
-    replies: replyMap.get(parent.id) || [],
-  }));
+  
+  // GET MESSAGES BY THREAD
+  
+  async getByThread(threadId: number, user: AuthUser) {
 
-  return result;
-}
+    const thread = await db.query.projectThreads.findFirst({
+      where: eq(projectThreads.id, threadId),
+    });
+
+    if (!thread) {
+      throw new ApiError(404, "Thread not found");
+    }
+
+    const { project, projectRole } = await getProjectContext(
+      user,
+      thread.projectId
+    );
+
+    if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+      throw new ApiError(403, "No access");
+    }
+
+    const allMessages = await db
+      .select()
+      .from(messages)
+      .where(
+        and(
+          eq(messages.threadId, threadId),
+          eq(messages.isDeleted, false)
+        )
+      )
+      .orderBy(messages.createdAt);
+
+    const parentMessages = allMessages.filter(m => !m.parentId);
+    const replies = allMessages.filter(m => m.parentId);
+
+    const replyMap = new Map<number, any[]>();
+
+    for (const reply of replies) {
+      if (reply.parentId !== null) {
+        if (!replyMap.has(reply.parentId)) {
+          replyMap.set(reply.parentId, []);
+        }
+        replyMap.get(reply.parentId)!.push(reply);
+      }
+    }
+
+    return parentMessages.map(parent => ({
+      ...parent,
+      replies: replyMap.get(parent.id) || [],
+    }));
+  }
+
+  
+  // DELETE MESSAGE
+  
+  async deleteMessage(messageId: number, user: AuthUser) {
+
+    const message = await db.query.messages.findFirst({
+      where: eq(messages.id, messageId),
+    });
+
+    if (!message || message.isDeleted) {
+      throw new ApiError(404, "Message not found");
+    }
+
+    const thread = await db.query.projectThreads.findFirst({
+      where: eq(projectThreads.id, message.threadId),
+    });
+
+    const { project, projectRole } = await getProjectContext(
+      user,
+      thread!.projectId
+    );
+
+    if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+      throw new ApiError(403, "No access");
+    }
+
+    if (!hasPermission({
+      user,
+      action: ACTIONS.DELETE_MESSAGE,
+      project,
+      projectRole,
+      resource: message
+    })) {
+      throw new ApiError(403, "Not allowed");
+    }
+
+    await db.update(messages)
+      .set({ isDeleted: true })
+      .where(eq(messages.id, messageId));
+
+    return true;
+  }
 }
 
 export const messageService = new MessageService();
