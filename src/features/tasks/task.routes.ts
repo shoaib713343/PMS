@@ -47,7 +47,7 @@ taskRouter.patch(
   protect,
   validate(updateTaskSchema),
   asyncHandler(
-  controller.updateTakController
+  controller.updateTaskController
   )
 );
 
