@@ -1,6 +1,7 @@
 import { boolean, integer, pgEnum, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { projectThreads } from "./projectThreads";
+import { projects } from "./projects";
 
 const taskStatusEnum = pgEnum("task_status", [
     "pending",
@@ -12,9 +13,10 @@ export const tasks = pgTable("tasks",{
 
   id:serial("id").primaryKey(),
 
+  projectId: integer("project_id").references(()=>projects.id).notNull(),
+
   threadId:integer("thread_id")
-     .references(()=>projectThreads.id)
-     .notNull(),
+     .references(()=>projectThreads.id),
 
   title:text("title").notNull(),
 

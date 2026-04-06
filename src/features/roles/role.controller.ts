@@ -4,10 +4,12 @@ import { ApiResponse } from "../../utils/ApiResponse";
 
 export async function createRoleController(req: Request, res: Response){
     const role = await roleService.createRoles(req.body.name, req.user!);
-        return new ApiResponse(
+        return res.status(201).json(
+            new ApiResponse(
             201,
             "Role created successfully",
             role
+        )
         )
     
 }
