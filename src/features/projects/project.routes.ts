@@ -17,7 +17,7 @@ import {
 import threadRouter from "../projectThreads/projectThread.routes";
 import { upload } from "../../middleware/multerMiddleware";
 
-const router = Router();
+const router = Router({mergeParams: true});
 
 
 router.post(
