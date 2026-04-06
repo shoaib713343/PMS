@@ -8,9 +8,9 @@ import taskRouter from "../tasks/task.routes";
 import { asyncHandler } from "../../utils/asyncHandler";
 import messageRouter from "../messages/message.routes";
 
-const threadRouter = Router({ mergeParams: true });  // ← IMPORTANT: mergeParams must be true
+const threadRouter = Router({ mergeParams: true });
 
-// Thread CRUD routes
+// Thread CRUD - specific routes FIRST
 threadRouter.post(
   "/",
   protect,
@@ -26,6 +26,7 @@ threadRouter.get(
 
 threadRouter.get("/all", protect, asyncHandler(controller.getAllThreadsController));
 
+// Parameterized routes - with :threadId
 threadRouter.get(
   "/:threadId",
   protect,
@@ -50,13 +51,8 @@ threadRouter.delete(
   asyncHandler(controller.deleteThreadController)
 );
 
-// IMPORTANT: Mount taskRouter WITHOUT the "/" prefix since it's already under /:threadId/tasks
-// The parent route will be /:threadId/tasks, so taskRouter handles everything after that
+// ✅ NESTED ROUTES - MUST come AFTER the parameterized routes
 threadRouter.use("/:threadId/tasks", taskRouter);
-
-threadRouter.use(
-  "/:threadId/messages",
-  messageRouter
-);
+threadRouter.use("/:threadId/messages", messageRouter);
 
 export default threadRouter;

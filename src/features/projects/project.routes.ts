@@ -18,9 +18,9 @@ import {
 import threadRouter from "../projectThreads/projectThread.routes";
 import { upload } from "../../middleware/multerMiddleware";
 
-const router = Router({ mergeParams: true });  // ← Add mergeParams
+const router = Router({ mergeParams: true });
 
-// Project CRUD routes
+// Project CRUD
 router.post(
   "/",
   protect,
@@ -68,9 +68,9 @@ router.delete(
   asyncHandler(removeProjectMemberController)
 );
 
-// Nested routes
+// ✅ NESTED ROUTES
 router.use("/:projectId/activity", logsRouter);
 router.use("/:projectId/threads", threadRouter);
-router.use("/:projectId/tasks", taskRouter);  // ← Add this line
+router.use("/:projectId/tasks", taskRouter);
 
 export default router;
