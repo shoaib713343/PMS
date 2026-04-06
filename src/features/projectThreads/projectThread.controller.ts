@@ -41,35 +41,26 @@ export const getAllThreadsController = async (req: Request, res: Response) => {
 
 
 export const getThreadsByProjectIdController = async (req: Request, res: Response) => {
-
   const projectId = Number(req.params.projectId);
 
   if(!projectId || isNaN(projectId)){
-    return res.status(400).json(
-      new ApiError(400, "Invalid project ID")
-    );
+    return res.status(400).json(new ApiError(400, "Invalid project ID"));
   }
 
   const pagination = getPagination(req.query);
-    const thread = await threadService.createThread({
-  topic: req.body.topic,
-  description: req.body.description,
-  priority: req.body.priority,
-  assignUserId: req.body.assignUserId,
-  dueDate: req.body.dueDate,
-  projectId
-}, req.user!);
   
+  // ✅ CORRECT: Call getThreadsByProjectId, not createThread!
+  const result = await threadService.getThreadsByProjectId(
+    projectId,
+    req.user!,
+    pagination,
+    req.query
+  );
 
   return res.status(200).json(
-    new ApiResponse(
-      200,
-      "Threads fetched successfully",
-      thread
-    )
+    new ApiResponse(200, "Threads fetched successfully", result)
   );
 };
-
 
 export const getThreadByIdController = async (req: Request, res: Response) => {
 

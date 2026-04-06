@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 
 import { projectThreads } from "../../db/schema/projectThreads";
@@ -99,51 +99,60 @@ class ThreadService {
 
   // GET THREADS BY PROJECT
 
-  async getThreadsByProjectId(
-    projectId: number,
-    user: AuthUser,
-    pagination: any,
-    query: any
-  ) {
 
-    const { project, projectRole } = await getProjectContext(user, projectId);
+async getThreadsByProjectId(
+  projectId: number,
+  user: AuthUser,
+  pagination: any,
+  query: any
+) {
+  const { project, projectRole } = await getProjectContext(user, projectId);
 
-    if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
-      throw new ApiError(403, "No access");
-    }
-
-    const { page, limit, offset, sortBy, order } = pagination;
-    const { status } = query;
-
-    const whereClause = and(
-      eq(projectThreads.projectId, projectId),
-      eq(projectThreads.isDeleted, false),
-      status ? eq(projectThreads.threadStatus, status) : undefined
-    );
-
-    const data = await db.query.projectThreads.findMany({
-      where: whereClause,
-      limit,
-      offset
-    });
-
-    const totalResult = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(projectThreads)
-      .where(whereClause);
-
-    const total = totalResult[0]?.count || 0;
-
-    return {
-      data,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit)
-      }
-    };
+  if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+    throw new ApiError(403, "No access");
   }
+
+  const { page, limit, offset, sortBy, order } = pagination;
+  const { status } = query;
+
+  const whereClause = and(
+    eq(projectThreads.projectId, projectId),
+    eq(projectThreads.isDeleted, false),
+    status ? eq(projectThreads.threadStatus, status) : undefined
+  );
+
+  // Add orderBy
+  let orderByClause: any;
+  if (sortBy === 'createdAt') {
+    orderByClause = order === 'desc' ? desc(projectThreads.createdAt) : asc(projectThreads.createdAt);
+  } else {
+    orderByClause = desc(projectThreads.createdAt);
+  }
+
+  const data = await db.query.projectThreads.findMany({
+    where: whereClause,
+    limit,
+    offset,
+    orderBy: orderByClause
+  });
+
+  const totalResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(projectThreads)
+    .where(whereClause);
+
+  const total = totalResult[0]?.count || 0;
+
+  return {
+    data,
+    pagination: {
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
+}
 
   // ======================
   // GET THREAD BY ID

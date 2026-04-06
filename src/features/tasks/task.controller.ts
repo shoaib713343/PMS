@@ -37,7 +37,7 @@ export async function getAllTasksController(req: Request, res: Response) {
   const user = req.user!;
 
   const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 10;
+  const limit = Number(req.query.limit) || 100;
   const sortBy = req.query.sortBy as string;
   const order = req.query.order as string;
 
@@ -53,7 +53,7 @@ export async function getAllTasksController(req: Request, res: Response) {
   );
 }
 
-// FIXED: Add validation for taskId
+
 export async function getTask(req: Request, res: Response) {
     // Validate taskId parameter
     const taskId = Number(req.params.taskId);
