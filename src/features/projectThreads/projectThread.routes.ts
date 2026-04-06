@@ -1,3 +1,4 @@
+// thread.routes.ts
 import { Router } from "express";
 import * as controller from "./projectThread.controller";
 import { protect } from "../../middleware/authMiddleware";
@@ -7,54 +8,55 @@ import taskRouter from "../tasks/task.routes";
 import { asyncHandler } from "../../utils/asyncHandler";
 import messageRouter from "../messages/message.routes";
 
-const threadRouter = Router({mergeParams: true});
+const threadRouter = Router({ mergeParams: true });  // ← IMPORTANT: mergeParams must be true
 
+// Thread CRUD routes
 threadRouter.post(
   "/",
-  protect, validate(createThreadSchema), asyncHandler(
-  controller.createThreadController)
+  protect,
+  validate(createThreadSchema),
+  asyncHandler(controller.createThreadController)
 );
 
 threadRouter.get(
   "/",
-  protect, asyncHandler(
-  controller.getThreadsByProjectIdController)
+  protect,
+  asyncHandler(controller.getThreadsByProjectIdController)
 );
 
 threadRouter.get("/all", protect, asyncHandler(controller.getAllThreadsController));
 
 threadRouter.get(
   "/:threadId",
-  protect, asyncHandler(
-  controller.getThreadByIdController)
+  protect,
+  asyncHandler(controller.getThreadByIdController)
 );
-
 
 threadRouter.patch(
   "/:threadId",
-  protect, asyncHandler(
-  controller.updateThreadController)
+  protect,
+  asyncHandler(controller.updateThreadController)
 );
 
 threadRouter.patch(
   "/:threadId/status",
-  protect, asyncHandler(controller.updateThreadStatusController)
-)
+  protect,
+  asyncHandler(controller.updateThreadStatusController)
+);
 
 threadRouter.delete(
   "/:threadId",
-  protect, asyncHandler(
-  controller.deleteThreadController)
+  protect,
+  asyncHandler(controller.deleteThreadController)
 );
 
-threadRouter.use(
-  "/:threadId/tasks", taskRouter
-)
+// IMPORTANT: Mount taskRouter WITHOUT the "/" prefix since it's already under /:threadId/tasks
+// The parent route will be /:threadId/tasks, so taskRouter handles everything after that
+threadRouter.use("/:threadId/tasks", taskRouter);
 
 threadRouter.use(
   "/:threadId/messages",
   messageRouter
-  )
-
+);
 
 export default threadRouter;

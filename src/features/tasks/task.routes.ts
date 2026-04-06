@@ -1,3 +1,4 @@
+// task.routes.ts
 import { Router } from "express";
 import * as controller from "./task.controller";
 import { protect } from "../../middleware/authMiddleware";
@@ -6,9 +7,13 @@ import { createtaskSchema, updateTaskSchema, updateTaskStatusSchema } from "./ta
 import { asyncHandler } from "../../utils/asyncHandler";
 import attachmentRoutes from "../attachments/attachment.routes";
 
-const taskRouter = Router();
+const taskRouter = Router({ mergeParams: true });  // ← IMPORTANT: mergeParams must be true
 
-// ✅ SPECIFIC ROUTES FIRST (exact paths)
+// These routes will be accessible at:
+// - /threads/:threadId/tasks (when mounted under threadRouter)
+// - /projects/:projectId/tasks (when mounted under projectRouter)
+// - /tasks (when mounted directly)
+
 // Get all tasks for user (with pagination)
 taskRouter.get(
   "/all",
@@ -16,19 +21,19 @@ taskRouter.get(
   asyncHandler(controller.getAllTasksController)
 );
 
-// Get tasks by project
-taskRouter.get(
-  "/projects/:projectId",
-  protect,
-  asyncHandler(controller.getProjectTasksController)
-);
-
-// Create task
+// Create task - threadId/projectId will come from parent route params
 taskRouter.post(
   "/",
   protect,
   validate(createtaskSchema),
   asyncHandler(controller.createTaskController)
+);
+
+// Get tasks by project - this is a specific route, must come before /:taskId
+taskRouter.get(
+  "/projects/:projectId",
+  protect,
+  asyncHandler(controller.getProjectTasksController)
 );
 
 // Get tasks by thread (existing)
@@ -38,8 +43,7 @@ taskRouter.get(
   asyncHandler(controller.getThreadTasks)
 );
 
-// ✅ PARAMETERIZED ROUTES LAST
-// Get single task
+// Get single task - this must come AFTER specific routes
 taskRouter.get(
   "/:taskId",
   protect,
@@ -57,7 +61,7 @@ taskRouter.patch(
 // Update task status
 taskRouter.patch(
   "/:taskId/status",
-  protect, 
+  protect,
   validate(updateTaskStatusSchema),
   asyncHandler(controller.updateTaskStatusController)
 );
@@ -72,4 +76,4 @@ taskRouter.delete(
 // Attachments routes
 taskRouter.use("/:taskId/attachments", attachmentRoutes);
 
-export default taskRouter;  // ← Make sure this exports taskRouter, not router
+export default taskRouter;

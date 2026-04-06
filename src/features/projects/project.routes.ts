@@ -1,3 +1,4 @@
+// project.routes.ts
 import { Router } from "express";
 import { protect } from "../../middleware/authMiddleware";
 import { allowRoles } from "../../middleware/rbac";
@@ -17,9 +18,9 @@ import {
 import threadRouter from "../projectThreads/projectThread.routes";
 import { upload } from "../../middleware/multerMiddleware";
 
-const router = Router({mergeParams: true});
+const router = Router({ mergeParams: true });  // ← Add mergeParams
 
-
+// Project CRUD routes
 router.post(
   "/",
   protect,
@@ -28,13 +29,11 @@ router.post(
   asyncHandler(createProjectController)
 );
 
-
 router.get(
   "/",
   protect,
   asyncHandler(listProjectsController)
 );
-
 
 router.get(
   "/:projectId",
@@ -42,13 +41,11 @@ router.get(
   asyncHandler(getProjectDetailsController)
 );
 
-
 router.put(
   "/:projectId",
   protect,
   asyncHandler(updateProjectController)
 );
-
 
 router.delete(
   "/:projectId",
@@ -56,7 +53,7 @@ router.delete(
   asyncHandler(deleteProjectController)
 );
 
-
+// Member routes
 router.post(
   "/:projectId/members",
   protect,
@@ -71,8 +68,9 @@ router.delete(
   asyncHandler(removeProjectMemberController)
 );
 
+// Nested routes
 router.use("/:projectId/activity", logsRouter);
 router.use("/:projectId/threads", threadRouter);
-router.use("/:projectId/tasks", taskRouter);
+router.use("/:projectId/tasks", taskRouter);  // ← Add this line
 
 export default router;
