@@ -4,7 +4,7 @@ import { ApiResponse } from "../../utils/ApiResponse";
 import { getPagination } from "../../utils/pagination";
 
 export async function createTaskController(req: Request, res: Response) {
-  const { threadId } = req.params;
+  const { threadId, projectId } = req.params; // Support both
 
   const {
     title,
@@ -17,7 +17,8 @@ export async function createTaskController(req: Request, res: Response) {
   const user = req.user!;
 
   const task = await taskService.createTask({
-    threadId: Number(threadId),
+    projectId: projectId ? Number(projectId) : undefined,
+    threadId: threadId ? Number(threadId) : undefined,
     title,
     description,
     gitLink,
@@ -50,8 +51,28 @@ export async function getAllTasksController(req: Request, res: Response) {
   );
 }
 
-export async function getTask(req: Request, res: Response){
+// NEW CONTROLLER - Get tasks by project
+export async function getProjectTasksController(req: Request, res: Response) {
+  const { projectId } = req.params;
+  const user = req.user!;
 
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
+  const sortBy = req.query.sortBy as string;
+  const order = req.query.order as string;
+
+  const result = await taskService.getProjectTasksService(
+    Number(projectId),
+    user,
+    { page, limit, sortBy, order }
+  );
+
+  return res.status(200).json(
+    new ApiResponse(200, "Project tasks fetched successfully", result)
+  );
+}
+
+export async function getTask(req: Request, res: Response){
     const task = await taskService.getTaskById(
       Number(req.params.taskId),
       req.user!
@@ -64,12 +85,9 @@ export async function getTask(req: Request, res: Response){
             task
         )
     )
-
 };
 
-
 export async function getThreadTasks(req: Request, res: Response) {
-
     const pagination = getPagination(req.query);
     const tasks = await taskService.getThreadTasksService(
         Number(req.params.threadId),
@@ -107,7 +125,6 @@ export async function updateTaskController(req: Request, res: Response) {
         updatedTask
       )
     );
-  
 }
 
 export async function updateTaskStatusController(req: Request, res: Response){
@@ -115,7 +132,6 @@ export async function updateTaskStatusController(req: Request, res: Response){
         Number(req.params.taskId),
         req.body.status,
         req.user!
-
     )
     return res.status(200).json(
         new ApiResponse(

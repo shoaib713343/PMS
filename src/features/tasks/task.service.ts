@@ -211,86 +211,108 @@ class TaskService {
   }
 
   // NEW METHOD: Get tasks by project (recommended)
-  async getProjectTasksService(
-    projectId: number,
-    user: AuthUser,
-    pagination: {
-      page: number;
-      limit: number;
-      sortBy?: string;
-      order?: string;
-    }
-  ) {
-    const { page, limit, sortBy, order } = pagination;
-    const offset = (page - 1) * limit;
 
-    // Check project access
-    const { project, projectRole } = await getProjectContext(user, projectId);
-    
-    if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
-      throw new ApiError(403, "No access");
-    }
+async getProjectTasksService(
+  projectId: number,
+  user: AuthUser,
+  pagination: {
+    page: number;
+    limit: number;
+    sortBy?: string;
+    order?: string;
+  }
+) {
+  const { page, limit, sortBy, order } = pagination;
+  const offset = (page - 1) * limit;
 
-    const selectFields = {
+  // Check project access
+  const { project, projectRole } = await getProjectContext(user, projectId);
+  
+  if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
+    throw new ApiError(403, "No access");
+  }
+
+  const selectFields = {
+    id: tasks.id,
+    title: tasks.title,
+    description: tasks.description,
+    taskStatus: tasks.taskStatus,
+    createdUser: tasks.createdUser,
+    projectId: tasks.projectId,
+    threadId: tasks.threadId,
+    gitLink: tasks.gitLink,
+    targetDate: tasks.targetDate,
+    createdAt: tasks.createdAt,
+    updatedAt: tasks.updatedAt,
+  };
+
+  // Build where clause
+  const whereConditions = [eq(tasks.projectId, projectId), eq(tasks.isDeleted, false)];
+  if (user.systemRole === "user") {
+    whereConditions.push(eq(taskAssignees.userId, user.id));
+  }
+  const whereClause = and(...whereConditions);
+
+  // Build main query
+  let mainQuery: any = db.select(selectFields).from(tasks);
+  if (user.systemRole === "user") {
+    mainQuery = mainQuery.innerJoin(taskAssignees, eq(tasks.id, taskAssignees.taskId));
+  }
+
+  // Add sorting
+  if (sortBy && order) {
+    const sortableColumns: Record<string, any> = {
       id: tasks.id,
       title: tasks.title,
-      description: tasks.description,
-      status: tasks.taskStatus,
+      taskStatus: tasks.taskStatus,
       createdUser: tasks.createdUser,
-      projectId: tasks.projectId,
-      threadId: tasks.threadId,
+      createdAt: tasks.createdAt,
     };
-
-    // Build where clause
-    const whereConditions = [eq(tasks.projectId, projectId), eq(tasks.isDeleted, false)];
-    if (user.systemRole === "user") {
-      whereConditions.push(eq(taskAssignees.userId, user.id));
+    
+    const column = sortableColumns[sortBy];
+    if (column) {
+      mainQuery = mainQuery.orderBy(order === 'desc' ? desc(column) : asc(column));
     }
-    const whereClause = and(...whereConditions);
-
-    // Build main query
-    let mainQuery: any = db.select(selectFields).from(tasks);
-    if (user.systemRole === "user") {
-      mainQuery = mainQuery.innerJoin(taskAssignees, eq(tasks.id, taskAssignees.taskId));
-    }
-
-    // Add sorting
-    if (sortBy && order) {
-      const sortableColumns: Record<string, any> = {
-        id: tasks.id,
-        title: tasks.title,
-        status: tasks.taskStatus,
-        createdUser: tasks.createdUser,
-      };
-      
-      const column = sortableColumns[sortBy];
-      if (column) {
-        mainQuery = mainQuery.orderBy(order === 'desc' ? desc(column) : asc(column));
-      }
-    }
-
-    // Build count query
-    let countQuery: any = db.select({ count: count() }).from(tasks);
-    if (user.systemRole === "user") {
-      countQuery = countQuery.innerJoin(taskAssignees, eq(tasks.id, taskAssignees.taskId));
-    }
-
-    // Execute queries
-    const [data, countResult] = await Promise.all([
-      mainQuery.where(whereClause).limit(limit).offset(offset),
-      countQuery.where(whereClause)
-    ]);
-
-    return {
-      data,
-      pagination: {
-        page,
-        limit,
-        total: Number(countResult[0]?.count) || 0,
-        totalPages: Math.ceil((Number(countResult[0]?.count) || 0) / limit)
-      }
-    };
+  } else {
+    mainQuery = mainQuery.orderBy(desc(tasks.createdAt));
   }
+
+  // Build count query
+  let countQuery: any = db.select({ count: count() }).from(tasks);
+  if (user.systemRole === "user") {
+    countQuery = countQuery.innerJoin(taskAssignees, eq(tasks.id, taskAssignees.taskId));
+  }
+
+  // Execute queries
+  const [data, countResult] = await Promise.all([
+    mainQuery.where(whereClause).limit(limit).offset(offset),
+    countQuery.where(whereClause)
+  ]);
+
+  // Fetch assignees for each task
+  const tasksWithAssignees = await Promise.all(
+    data.map(async (task: any) => {
+      const assignees = await db.select({
+        userId: taskAssignees.userId
+      }).from(taskAssignees).where(eq(taskAssignees.taskId, task.id));
+      
+      return {
+        ...task,
+        assignees: assignees.map(a => a.userId)
+      };
+    })
+  );
+
+  return {
+    data: tasksWithAssignees,
+    pagination: {
+      page,
+      limit,
+      total: Number(countResult[0]?.count) || 0,
+      totalPages: Math.ceil((Number(countResult[0]?.count) || 0) / limit)
+    }
+  };
+}
 
   // GET THREAD TASKS - FIXED (now redirects to project tasks)
   async getThreadTasksService(

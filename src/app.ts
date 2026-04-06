@@ -7,7 +7,7 @@ import projectRouter from "./features/projects/project.routes";
 import userRouter from "./features/users/user.routes";
 import rolesRouter from "./features/roles/role.routes";
 import threadRouter from "./features/projectThreads/projectThread.routes";
-import {taskRouter} from "./features/tasks/task.routes";
+import { taskRouter } from "./features/tasks/task.routes";
 import dashboardRouter from "./features/dashboard/dashboard.route";
 
 import path from "path";
@@ -27,25 +27,37 @@ app.use(
   })
 );
 
-
 app.use(cookieParser());
-app.use("/images", express.static(path.join(process.cwd(), "public/images")))
+app.use("/images", express.static(path.join(process.cwd(), "public/images")));
 
-app.get("/", (req, res)=>{
+app.get("/", (req, res) => {
     res.status(200).json({
         message: "Server is up and running"
-    })
-})
+    });
+});
 
+// Auth routes
 app.use("/api/v1/auth", authRouter);
+
+// Dashboard routes
 app.use("/api/v1/dashboard", dashboardRouter);
+
+// User routes
 app.use("/api/v1/users", userRouter);
-app.use("/api/v1/projects", projectRouter);
+
+// Role routes
 app.use("/api/v1/roles", rolesRouter);
-app.use("/api/v1/threads", threadRouter);
+
+// Task routes 
 app.use("/api/v1/tasks", taskRouter);
 
+// Project routes (with nested routes)
+app.use("/api/v1/projects", projectRouter);
 
+// Thread routes (with nested routes)
+app.use("/api/v1/threads", threadRouter);
+
+// Error handler
 app.use(errorHandler);
 
 export default app;

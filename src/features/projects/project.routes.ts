@@ -3,6 +3,7 @@ import { protect } from "../../middleware/authMiddleware";
 import { allowRoles } from "../../middleware/rbac";
 import { asyncHandler } from "../../utils/asyncHandler";
 import logsRouter from "../activity/activity.routes";
+import taskRouter from "../tasks/task.routes";
 
 import {
   createProjectController,
@@ -72,5 +73,6 @@ router.delete(
 
 router.use("/:projectId/activity", logsRouter);
 router.use("/:projectId/threads", threadRouter);
+router.use("/:projectId/tasks", taskRouter);
 
 export default router;
