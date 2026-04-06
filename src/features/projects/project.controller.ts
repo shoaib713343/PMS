@@ -13,12 +13,24 @@ export async function createProjectController(req: Request, res: Response) {
     let manualUrl = undefined;
 
     if (file) {
-      const result = await cloudinary.uploader.upload(file.path);
+      // Fix: Use buffer instead of path since using memoryStorage
+      const uploadResult = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          { folder: "project_manuals" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        uploadStream.end(file.buffer);
+      });
+      
+      const result = uploadResult as any;
       manualUrl = result.secure_url;
-      fs.unlinkSync(file.path);
+      // No need for fs.unlinkSync since there's no file on disk
     }
 
-    // Parse members if it's a string (from form-data)
+    // Rest of your code remains the same...
     let members = req.body.members;
     if (typeof members === 'string') {
       try {
@@ -29,21 +41,12 @@ export async function createProjectController(req: Request, res: Response) {
       }
     }
 
-    // Validate and clean members data
     const validMembers = Array.isArray(members) ? members
       .filter(m => m && m.userId && m.roleName)
       .map(m => ({
         userId: Number(m.userId),
         roleName: m.roleName.trim()
       })) : [];
-
-    console.log('Creating project with:', {
-      title: req.body.title,
-      description: req.body.description,
-      createdBy: req.user?.id,
-      members: validMembers,
-      userManualUrl: manualUrl
-    });
 
     const project = await projectService.createProject({
       title: req.body.title,
