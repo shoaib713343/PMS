@@ -1,3 +1,4 @@
+// task.validation.ts
 import {z} from "zod";
 
 export const createtaskSchema = z.object({
@@ -8,7 +9,7 @@ export const createtaskSchema = z.object({
     body: z.object({
         title: z.string().min(1, "Title is required"),
         description: z.string().optional(),
-        gitLink: z.string().url().optional().nullable(),
+        gitLink: z.string().optional().nullable(),
         targetDate: z.string().optional(),
         assignedUserIds: z.array(z.number()).optional(),
     })
@@ -21,7 +22,7 @@ export const updateTaskSchema = z.object({
     body: z.object({
         title: z.string().min(1).optional(),
         description: z.string().optional(),
-        gitLink: z.string().url().optional().nullable(),
+        gitLink: z.string().optional().nullable(),
         targetDate: z.string().optional(),
         taskStatus: z.enum(["pending", "in_progress", "completed"]).optional(),
     })

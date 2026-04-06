@@ -4,7 +4,9 @@ import { ApiResponse } from "../../utils/ApiResponse";
 import { getPagination } from "../../utils/pagination";
 
 export async function createTaskController(req: Request, res: Response) {
-  const { threadId, projectId } = req.params;
+  // Get from both params and query (for project tasks)
+  const threadId = req.params.threadId || req.query.threadId;
+  const projectId = req.params.projectId || req.query.projectId;
 
   const {
     title,

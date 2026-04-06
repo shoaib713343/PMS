@@ -6,41 +6,39 @@ import { createtaskSchema, updateTaskSchema, updateTaskStatusSchema } from "./ta
 import { asyncHandler } from "../../utils/asyncHandler";
 import attachmentRoutes from "../attachments/attachment.routes";
 
-const router = Router({mergeParams: true});
+const taskRouter = Router();
 
-export const taskRouter = Router();
-
+// ✅ SPECIFIC ROUTES FIRST (exact paths)
 // Get all tasks for user (with pagination)
-router.get(
+taskRouter.get(
   "/all",
   protect,
   asyncHandler(controller.getAllTasksController)
 );
 
+// Get tasks by project
+taskRouter.get(
+  "/projects/:projectId",
+  protect,
+  asyncHandler(controller.getProjectTasksController)
+);
 
 // Create task
-router.post(
+taskRouter.post(
   "/",
   protect,
   validate(createtaskSchema),
   asyncHandler(controller.createTaskController)
 );
 
-
-// Get tasks by project - NEW ENDPOINT
-router.get(
-  "/projects/:projectId",
-  protect,
-  asyncHandler(controller.getProjectTasksController)
-);
-
 // Get tasks by thread (existing)
-router.get(
+taskRouter.get(
   "/",
   protect,
   asyncHandler(controller.getThreadTasks)
 );
 
+// ✅ PARAMETERIZED ROUTES LAST
 // Get single task
 taskRouter.get(
   "/:taskId",
@@ -74,4 +72,4 @@ taskRouter.delete(
 // Attachments routes
 taskRouter.use("/:taskId/attachments", attachmentRoutes);
 
-export default router;
+export default taskRouter;  // ← Make sure this exports taskRouter, not router
