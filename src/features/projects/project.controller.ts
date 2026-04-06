@@ -1,3 +1,4 @@
+// project.controller.ts
 import { Request, Response } from "express";
 import { projectService } from "./project.service";
 import { ApiResponse } from "../../utils/ApiResponse";
@@ -6,43 +7,70 @@ import { getPagination } from "../../utils/pagination";
 import cloudinary from "../../config/cloudinary";
 import fs from "fs";
 
-export async function createProjectController(req: Request, res: Response){
-
-
+export async function createProjectController(req: Request, res: Response) {
+  try {
     const file = req.file;
-
     let manualUrl = undefined;
 
     if (file) {
-  const result = await cloudinary.uploader.upload(file.path);
+      const result = await cloudinary.uploader.upload(file.path);
+      manualUrl = result.secure_url;
+      fs.unlinkSync(file.path);
+    }
 
-  manualUrl = result.secure_url;
+    // Parse members if it's a string (from form-data)
+    let members = req.body.members;
+    if (typeof members === 'string') {
+      try {
+        members = JSON.parse(members);
+      } catch (e) {
+        console.error('Failed to parse members:', e);
+        members = [];
+      }
+    }
 
-  fs.unlinkSync(file.path);
-}
+    // Validate and clean members data
+    const validMembers = Array.isArray(members) ? members
+      .filter(m => m && m.userId && m.roleName)
+      .map(m => ({
+        userId: Number(m.userId),
+        roleName: m.roleName.trim()
+      })) : [];
+
+    console.log('Creating project with:', {
+      title: req.body.title,
+      description: req.body.description,
+      createdBy: req.user?.id,
+      members: validMembers,
+      userManualUrl: manualUrl
+    });
 
     const project = await projectService.createProject({
-        title: req.body.title,
-        description: req.body.description,
-        createdBy: Number(req.user?.id),
-        members: req.body.members,
-        userManualUrl: manualUrl,
-    })
+      title: req.body.title,
+      description: req.body.description,
+      createdBy: Number(req.user?.id),
+      members: validMembers,
+      userManualUrl: manualUrl,
+    });
 
     return res.status(201).json(
-        new ApiResponse(201, "Project created successfully", project)
+      new ApiResponse(201, "Project created successfully", project)
     );
+  } catch (error: any) {
+    console.error('Create project error:', error);
+    
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    
+    throw new ApiError(500, error.message || "Failed to create project");
+  }
 }
 
 export const listProjectsController = async (req: Request, res: Response) => {
   const user = req.user!;
-
   const pagination = getPagination(req.query);
-
-  const projects = await projectService.listProjects(
-    user,
-    pagination
-  );
+  const projects = await projectService.listProjects(user, pagination);
 
   res.status(200).json({
     success: true,
@@ -54,14 +82,9 @@ export const getProjectDetailsController = async (
   req: Request,
   res: Response
 ) => {
-  
   const projectId = Number(req.params.projectId);
   const user = req.user!;
-
-  const project = await projectService.getProjectDetails(
-    Number(projectId),
-    user
-  );
+  const project = await projectService.getProjectDetails(Number(projectId), user);
 
   res.status(200).json({
     success: true,
@@ -73,10 +96,9 @@ export const updateProjectController = async (
   req: Request,
   res: Response
 ) => {
-  const  projectId  = req.params.projectId;
+  const projectId = req.params.projectId;
   const { title, description } = req.body;
   const user = req.user!;
-  const systemRole = req.user?.systemRole!;
 
   const updated = await projectService.updateProject(
     Number(projectId),
@@ -99,7 +121,6 @@ export const deleteProjectController = async (
 ) => {
   const { projectId } = req.params;
   const user = req.user!;
-
   await projectService.deleteProject(Number(projectId), user);
 
   res.status(200).json({
@@ -111,17 +132,13 @@ export const deleteProjectController = async (
 export async function assignProjectMember(req: Request, res: Response) {
   const projectId = Number(req.params.projectId);
   const { userId, roleName } = req.body;
-
   const currentUser = req.user;
 
   if (!currentUser) {
     throw new ApiError(401, "Unauthorized");
   }
 
-  if (
-    currentUser.systemRole !== "admin" &&
-    currentUser.systemRole !== "super_admin"
-  ) {
+  if (currentUser.systemRole !== "admin" && currentUser.systemRole !== "super_admin") {
     throw new ApiError(403, "Not allowed to assign members");
   }
 
@@ -130,7 +147,6 @@ export async function assignProjectMember(req: Request, res: Response) {
   }
 
   const parsedUserId = Number(userId);
-
   if (!userId || isNaN(parsedUserId)) {
     throw new ApiError(400, "Invalid userId");
   }
@@ -147,10 +163,10 @@ export async function assignProjectMember(req: Request, res: Response) {
   );
 
   res.status(200).json({
+    success: true,
     message: "User assigned successfully",
   });
 }
-
 
 export const removeProjectMemberController = async (
   req: Request,
@@ -158,16 +174,10 @@ export const removeProjectMemberController = async (
 ) => {
   const { projectId, userId } = req.params;
   const currentUser = req.user!;
-
-  await projectService.removeProjectMember(
-    Number(projectId),
-    Number(userId),
-    currentUser
-  );
+  await projectService.removeProjectMember(Number(projectId), Number(userId), currentUser);
 
   res.status(200).json({
     success: true,
     message: "Member removed successfully",
   });
 };
-

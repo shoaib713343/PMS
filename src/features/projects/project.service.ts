@@ -18,81 +18,105 @@ class ProjectService {
 
   // CREATE PROJECT
   
-  async createProject(options: {
-    title: string;
-    description?: string;
-    createdBy: number;
-    members?: { userId: number; roleName: string }[];
-    userManualUrl?: string;
-  }) {
-    return await db.transaction(async (tx) => {
+async createProject(options: {
+  title: string;
+  description?: string;
+  createdBy: number;
+  members?: { userId: number; roleName: string }[];
+  userManualUrl?: string;
+}) {
+  return await db.transaction(async (tx) => {
+    // Validate required fields
+    if (!options.title) {
+      throw new ApiError(400, "Project title is required");
+    }
 
-      const [project] = await tx
-        .insert(projects)
-        .values({
-          title: options.title,
-          description: options.description ?? null,
-          createdBy: options.createdBy,
-          userManual: options.userManualUrl ?? null
-        })
-        .returning();
+    if (!options.createdBy) {
+      throw new ApiError(400, "CreatedBy is required");
+    }
 
-      const roleList = await tx.select().from(roles);
-      const roleMap = new Map(roleList.map((r) => [r.name, r]));
+    const [project] = await tx
+      .insert(projects)
+      .values({
+        title: options.title,
+        description: options.description ?? null,
+        createdBy: options.createdBy,
+        userManual: options.userManualUrl ?? null
+      })
+      .returning();
 
-      const projectAdminRole = roleMap.get("project_admin");
+    // Get all roles
+    const roleList = await tx.select().from(roles);
+    const roleMap = new Map(roleList.map((r) => [r.name, r]));
 
-      if (!projectAdminRole) {
-        throw new ApiError(500, "project_admin role not found");
-      }
+    // Check if project_admin role exists
+    const projectAdminRole = roleMap.get("project_admin");
+    if (!projectAdminRole) {
+      throw new ApiError(500, "project_admin role not found in database");
+    }
 
-      // creator → project_admin
-      await tx.insert(projectUsers).values({
-        projectId: project.id,
-        userId: options.createdBy,
-        roleId: projectAdminRole.id,
-        readAccess: true,
-        writeAccess: true,
-        updateAccess: true,
-        deleteAccess: true,
-      });
-
-      if (options.members?.length) {
-        const uniqueUserIds = new Set<number>();
-
-        for (const member of options.members) {
-
-          if (member.userId === options.createdBy) continue;
-
-          if (uniqueUserIds.has(member.userId)) {
-            throw new ApiError(400, "Duplicate member");
-          }
-
-          uniqueUserIds.add(member.userId);
-
-          const role = roleMap.get(member.roleName);
-
-          if (!role) {
-            throw new ApiError(400, `Role ${member.roleName} not found`);
-          }
-
-          const isProjectAdmin = member.roleName === "project_admin";
-
-          await tx.insert(projectUsers).values({
-            projectId: project.id,
-            userId: member.userId,
-            roleId: role.id,
-            readAccess: true,
-            writeAccess: isProjectAdmin,
-            updateAccess: isProjectAdmin,
-            deleteAccess: isProjectAdmin,
-          });
-        }
-      }
-
-      return project;
+    // Add creator as project_admin
+    await tx.insert(projectUsers).values({
+      projectId: project.id,
+      userId: options.createdBy,
+      roleId: projectAdminRole.id,
+      readAccess: true,
+      writeAccess: true,
+      updateAccess: true,
+      deleteAccess: true,
     });
-  }
+
+    // Add members if provided
+    if (options.members && options.members.length > 0) {
+      const uniqueUserIds = new Set<number>();
+      uniqueUserIds.add(options.createdBy); // Prevent adding creator again
+
+      for (const member of options.members) {
+        // Validate member data
+        if (!member.userId) {
+          console.warn('Skipping member with no userId:', member);
+          continue;
+        }
+
+        if (!member.roleName) {
+          console.warn(`Skipping member ${member.userId} with no roleName`);
+          continue;
+        }
+
+        // Skip if already added (creator)
+        if (member.userId === options.createdBy) {
+          continue;
+        }
+
+        // Check for duplicates
+        if (uniqueUserIds.has(member.userId)) {
+          throw new ApiError(400, `Duplicate member: ${member.userId}`);
+        }
+        uniqueUserIds.add(member.userId);
+
+        // Get role
+        const role = roleMap.get(member.roleName);
+        if (!role) {
+          throw new ApiError(400, `Role "${member.roleName}" not found. Available roles: ${Array.from(roleMap.keys()).join(', ')}`);
+        }
+
+        const isProjectAdmin = member.roleName === "project_admin";
+
+        await tx.insert(projectUsers).values({
+          projectId: project.id,
+          userId: member.userId,
+          roleId: role.id,
+          readAccess: true,
+          writeAccess: isProjectAdmin,
+          updateAccess: isProjectAdmin,
+          deleteAccess: isProjectAdmin,
+        });
+      }
+    }
+
+    return project;
+  });
+}
 
   // LIST PROJECTS
 
