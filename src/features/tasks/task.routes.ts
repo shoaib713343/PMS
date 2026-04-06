@@ -10,6 +10,14 @@ const router = Router({mergeParams: true});
 
 export const taskRouter = Router();
 
+// Get all tasks for user (with pagination)
+router.get(
+  "/all",
+  protect,
+  asyncHandler(controller.getAllTasksController)
+);
+
+
 // Create task
 router.post(
   "/",
@@ -18,12 +26,6 @@ router.post(
   asyncHandler(controller.createTaskController)
 );
 
-// Get all tasks for user (with pagination)
-router.get(
-  "/all",
-  protect,
-  asyncHandler(controller.getAllTasksController)
-);
 
 // Get tasks by project - NEW ENDPOINT
 router.get(
