@@ -2,7 +2,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 
 import { projectThreads } from "../../db/schema/projectThreads";
-import { projects } from "../../db/schema";
+import { projects, tasks } from "../../db/schema";
 
 import { ApiError } from "../../utils/ApiError";
 
@@ -225,7 +225,9 @@ async getThreadsByProjectId(
   // ======================
   // DELETE THREAD
   // ======================
-  async deleteThread(threadId: number, user: AuthUser) {
+  // projectThread.service.ts - Update deleteThread method
+
+async deleteThread(threadId: number, user: AuthUser) {
 
     const thread = await db.query.projectThreads.findFirst({
       where: eq(projectThreads.id, threadId)
@@ -254,10 +256,20 @@ async getThreadsByProjectId(
       throw new ApiError(403, "Not allowed");
     }
 
+    // ✅ FIRST: Delete all tasks associated with this thread
+    await db.update(tasks)
+  .set({ 
+    isDeleted: true, 
+  })
+  .where(eq(tasks.threadId, threadId));
+    
+    // ✅ SECOND: Delete (soft delete) the thread
     await db.update(projectThreads)
-      .set({ isDeleted: true })
+      .set({ 
+        isDeleted: true,
+      })
       .where(eq(projectThreads.id, threadId));
-  }
+}
 
   // ======================
   // UPDATE THREAD STATUS
