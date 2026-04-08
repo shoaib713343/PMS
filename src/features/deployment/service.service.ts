@@ -45,6 +45,64 @@ export class ServiceManagementService {
       .innerJoin(services, eq(userServices.serviceId, services.id))
       .where(eq(userServices.userId, userId));
   }
+
+  // Update service
+async updateService(serviceId: number, data: any, user: AuthUser) {
+  if (user.systemRole !== "super_admin") {
+    throw new ApiError(403, "Only super admin can update services");
+  }
+
+  const [updated] = await db.update(services)
+    .set({
+      name: data.name,
+      description: data.description,
+      updatedAt: new Date(),
+    })
+    .where(eq(services.id, serviceId))
+    .returning();
+
+  if (!updated) {
+    throw new ApiError(404, "Service not found");
+  }
+
+  return updated;
+}
+
+// Soft delete service
+async deleteService(serviceId: number, user: AuthUser) {
+  if (user.systemRole !== "super_admin") {
+    throw new ApiError(403, "Only super admin can delete services");
+  }
+
+  const [updated] = await db.update(services)
+    .set({
+      isDeleted: true,
+      updatedAt: new Date(),
+    })
+    .where(eq(services.id, serviceId))
+    .returning();
+
+  if (!updated) {
+    throw new ApiError(404, "Service not found");
+  }
+
+  return { success: true };
+}
+
+// Remove service from user
+async removeServiceFromUser(userId: number, serviceId: number, user: AuthUser) {
+  if (user.systemRole !== "super_admin") {
+    throw new ApiError(403, "Only super admin can remove service assignments");
+  }
+
+  await db.delete(userServices)
+    .where(and(
+      eq(userServices.userId, userId),
+      eq(userServices.serviceId, serviceId)
+    ));
+
+  return { success: true };
+}
 }
 
 export const serviceManagementService = new ServiceManagementService();

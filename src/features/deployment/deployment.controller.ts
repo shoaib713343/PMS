@@ -45,3 +45,42 @@ export async function assignServiceToUserController(req: Request, res: Response)
   );
   return res.status(200).json(new ApiResponse(200, "Service assigned to user", assignment));
 }
+
+// Server controllers
+export async function updateServerController(req: Request, res: Response) {
+  const server = await serverService.updateServer(
+    Number(req.params.serverId), 
+    req.body, 
+    req.user!
+  );
+  return res.status(200).json(new ApiResponse(200, "Server updated", server));
+}
+
+export async function deleteServerController(req: Request, res: Response) {
+  await serverService.deleteServer(Number(req.params.serverId), req.user!);
+  return res.status(200).json(new ApiResponse(200, "Server deleted", null));
+}
+
+// Service controllers
+export async function updateServiceController(req: Request, res: Response) {
+  const service = await serviceManagementService.updateService(
+    Number(req.params.serviceId), 
+    req.body, 
+    req.user!
+  );
+  return res.status(200).json(new ApiResponse(200, "Service updated", service));
+}
+
+export async function deleteServiceController(req: Request, res: Response) {
+  await serviceManagementService.deleteService(Number(req.params.serviceId), req.user!);
+  return res.status(200).json(new ApiResponse(200, "Service deleted", null));
+}
+
+export async function removeServiceFromUserController(req: Request, res: Response) {
+  await serviceManagementService.removeServiceFromUser(
+    Number(req.params.userId), 
+    Number(req.params.serviceId), 
+    req.user!
+  );
+  return res.status(200).json(new ApiResponse(200, "Service removed from user", null));
+}

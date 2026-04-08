@@ -51,6 +51,57 @@ export class ServerService {
             .where(eq(projectServers.projectId, projectId))
     }
 
+    // Update server
+async updateServer(serverId: number, data: any, user: AuthUser) {
+  if (user.systemRole !== "super_admin") {
+    throw new ApiError(403, "Only super admin can update servers");
+  }
+
+  const [updated] = await db.update(servers)
+    .set({
+      publicIp: data.publicIp,
+      privateIp: data.privateIp,
+      environment: data.environment,
+      serverType: data.serverType,
+      status: data.status,
+      updatedAt: new Date(),
+    })
+    .where(eq(servers.id, serverId))
+    .returning();
+
+  if (!updated) {
+    throw new ApiError(404, "Server not found");
+  }
+
+  return updated;
+}
+
+// Delete server (soft delete or hard delete)
+async deleteServer(serverId: number, user: AuthUser) {
+  if (user.systemRole !== "super_admin") {
+    throw new ApiError(403, "Only super admin can delete servers");
+  }
+
+  // Check if server is assigned to any project
+  const assignments = await db.select()
+    .from(projectServers)
+    .where(eq(projectServers.serverId, serverId));
+
+  if (assignments.length > 0) {
+    throw new ApiError(400, "Cannot delete server. It's assigned to projects. Remove assignments first.");
+  }
+
+  const [deleted] = await db.delete(servers)
+    .where(eq(servers.id, serverId))
+    .returning();
+
+  if (!deleted) {
+    throw new ApiError(404, "Server not found");
+  }
+
+  return { success: true };
+}
+
 }
 
 export const serverService = new ServerService();
