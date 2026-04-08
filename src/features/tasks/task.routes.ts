@@ -9,7 +9,6 @@ import attachmentRoutes from "../attachments/attachment.routes";
 
 const taskRouter = Router({ mergeParams: true });
 
-// ✅ SPECIFIC ROUTES FIRST (exact paths)
 taskRouter.get(
   "/all",
   protect,
@@ -22,7 +21,6 @@ taskRouter.get(
   asyncHandler(controller.getProjectTasksController)
 );
 
-// ✅ Create task - THIS IS WHAT YOU NEED FOR POST /threads/:threadId/tasks
 taskRouter.post(
   "/",
   protect,
@@ -30,7 +28,7 @@ taskRouter.post(
   asyncHandler(controller.createTaskController)
 );
 
-// Get tasks by thread (existing)
+
 taskRouter.get(
   "/",
   protect,
