@@ -10,11 +10,16 @@ import { getProjectContext } from "../../utils/getProjectContext";
 import { canAccessProject } from "../../utils/projectAccess";
 import { hasPermission } from "../../utils/permission";
 import { ACTIONS } from "../../constants/actions";
+import { users } from "../../db/schema";
 
 type AuthUser = {
   id: number;
-  systemRole: "admin" | "user" | "super_admin";
+  email: string;
+  firstName: string;
+  lastName: string;
+  systemRole: "user" | "admin" | "super_admin";
 };
+ 
 
 class MessageService {
 
@@ -75,6 +80,55 @@ class MessageService {
         parentId: options.parentId
       })
       .returning();
+
+    // ========== SEND EMAIL NOTIFICATIONS TO OTHER PARTICIPANTS ==========
+    try {
+      // Get all participants who have sent messages in this thread (excluding current user)
+      const participants = await db
+        .selectDistinct({ 
+          userId: messages.userId,
+          userEmail: users.email,
+          userFirstName: users.firstName,
+          userLastName: users.lastName
+        })
+        .from(messages)
+        .innerJoin(users, eq(messages.userId, users.id))
+        .where(
+          and(
+            eq(messages.threadId, options.threadId),
+            eq(users.isDeleted, false)
+          )
+        );
+
+      // Get sender name
+      const senderName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || `User ${user.id}`;
+      
+      // Get thread topic for email subject
+      const threadTopic = thread.topic || 'Discussion Thread';
+      
+      // Import email service dynamically
+      const { emailNotificationService } = await import("../../services/email.service");
+
+      // Send email to each participant (except the sender)
+      for (const participant of participants) {
+        if (participant.userId !== user.id && participant.userEmail) {
+          await emailNotificationService.sendNewMessageEmail(
+            options.threadId,
+            threadTopic,
+            options.content,
+            participant.userId,
+            senderName,
+            thread.projectId
+          );
+          
+          console.log(`📧 New message notification sent to ${participant.userEmail}`);
+        }
+      }
+    } catch (emailError) {
+      // Don't fail the message creation if email fails
+      console.error('Failed to send email notifications:', emailError);
+    }
+    // ====================================================================
 
     return message;
   }

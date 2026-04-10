@@ -77,6 +77,23 @@ class TaskService {
             userId: uId,
           }))
         );
+
+        const project = await tx.query.projects.findFirst({
+          where: eq(projects.id, projectId),
+        });
+
+        const {emailNotificationService} = await import("../../services/email.service");
+
+        for(const assignedUserId of options.assignedUserIds){
+          await emailNotificationService.sendTaskAssignmentEmail(
+            task.id,
+            assignedUserId,
+            options.title,
+            project?.title || "Project"
+          );
+        }
+
+
       }
 
       await logActivity({
@@ -419,6 +436,8 @@ async getProjectTasksService(
       throw new ApiError(403, "Not allowed to update task status");
     }
 
+    const oldStatus = task.taskStatus;
+
     // Update status
     const [updated] = await db.update(tasks)
       .set({
@@ -427,6 +446,26 @@ async getProjectTasksService(
       })
       .where(eq(tasks.id, taskId))
       .returning();
+
+    const assignees = await db.select()
+      .from(taskAssignees)
+      .where(eq(taskAssignees.taskId, taskId));
+
+    const {emailNotificationService} = await import("../../services/email.service");
+
+    for(const assignee of assignees){
+      if(assignee.userId !== user.id){
+        await emailNotificationService.sendTaskStatusChangedEmail(
+          taskId,
+          assignee.userId,
+          task.title,
+          oldStatus || 'unknown',
+          status
+        )
+      }
+    }
+
+
 
     return updated;
   }

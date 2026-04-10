@@ -11,6 +11,9 @@ import { ACTIONS } from "../../constants/actions";
 
 type AuthUser = {
   id: number;
+  email: string;
+  firstName: string;
+  lastName: string;
   systemRole: "admin" | "user" | "super_admin";
 };
 
@@ -18,105 +21,124 @@ class ProjectService {
 
   // CREATE PROJECT
   
-async createProject(options: {
-  title: string;
-  description?: string;
-  createdBy: number;
-  members?: { userId: number; roleName: string }[];
-  userManualUrl?: string;
-}) {
-  return await db.transaction(async (tx) => {
-    // Validate required fields
-    if (!options.title) {
-      throw new ApiError(400, "Project title is required");
-    }
-
-    if (!options.createdBy) {
-      throw new ApiError(400, "CreatedBy is required");
-    }
-
-    const [project] = await tx
-      .insert(projects)
-      .values({
-        title: options.title,
-        description: options.description ?? null,
-        createdBy: options.createdBy,
-        userManual: options.userManualUrl ?? null
-      })
-      .returning();
-
-    // Get all roles
-    const roleList = await tx.select().from(roles);
-    const roleMap = new Map(roleList.map((r) => [r.name, r]));
-
-    // Check if project_admin role exists
-    const projectAdminRole = roleMap.get("project_admin");
-    if (!projectAdminRole) {
-      throw new ApiError(500, "project_admin role not found in database");
-    }
-
-    // Add creator as project_admin
-    await tx.insert(projectUsers).values({
-      projectId: project.id,
-      userId: options.createdBy,
-      roleId: projectAdminRole.id,
-      readAccess: true,
-      writeAccess: true,
-      updateAccess: true,
-      deleteAccess: true,
-    });
-
-    // Add members if provided
-    if (options.members && options.members.length > 0) {
-      const uniqueUserIds = new Set<number>();
-      uniqueUserIds.add(options.createdBy); // Prevent adding creator again
-
-      for (const member of options.members) {
-        // Validate member data
-        if (!member.userId) {
-          console.warn('Skipping member with no userId:', member);
-          continue;
-        }
-
-        if (!member.roleName) {
-          console.warn(`Skipping member ${member.userId} with no roleName`);
-          continue;
-        }
-
-        // Skip if already added (creator)
-        if (member.userId === options.createdBy) {
-          continue;
-        }
-
-        // Check for duplicates
-        if (uniqueUserIds.has(member.userId)) {
-          throw new ApiError(400, `Duplicate member: ${member.userId}`);
-        }
-        uniqueUserIds.add(member.userId);
-
-        // Get role
-        const role = roleMap.get(member.roleName);
-        if (!role) {
-          throw new ApiError(400, `Role "${member.roleName}" not found. Available roles: ${Array.from(roleMap.keys()).join(', ')}`);
-        }
-
-        const isProjectAdmin = member.roleName === "project_admin";
-
-        await tx.insert(projectUsers).values({
-          projectId: project.id,
-          userId: member.userId,
-          roleId: role.id,
-          readAccess: true,
-          writeAccess: isProjectAdmin,
-          updateAccess: isProjectAdmin,
-          deleteAccess: isProjectAdmin,
-        });
+ async createProject(options: {
+    title: string;
+    description?: string;
+    createdBy: number;
+    members?: { userId: number; roleName: string }[];
+    userManualUrl?: string;
+  }) {
+    return await db.transaction(async (tx) => {
+      // Validate required fields
+      if (!options.title) {
+        throw new ApiError(400, "Project title is required");
       }
-    }
 
-    return project;
-  });
-}
+      if (!options.createdBy) {
+        throw new ApiError(400, "CreatedBy is required");
+      }
+
+      const [project] = await tx
+        .insert(projects)
+        .values({
+          title: options.title,
+          description: options.description ?? null,
+          createdBy: options.createdBy,
+          userManual: options.userManualUrl ?? null
+        })
+        .returning();
+
+      // Get all roles
+      const roleList = await tx.select().from(roles);
+      const roleMap = new Map(roleList.map((r) => [r.name, r]));
+
+      // Check if project_admin role exists
+      const projectAdminRole = roleMap.get("project_admin");
+      if (!projectAdminRole) {
+        throw new ApiError(500, "project_admin role not found in database");
+      }
+
+      // Add creator as project_admin
+      await tx.insert(projectUsers).values({
+        projectId: project.id,
+        userId: options.createdBy,
+        roleId: projectAdminRole.id,
+        readAccess: true,
+        writeAccess: true,
+        updateAccess: true,
+        deleteAccess: true,
+      });
+
+      // Add members if provided
+      if (options.members && options.members.length > 0) {
+        const uniqueUserIds = new Set<number>();
+        uniqueUserIds.add(options.createdBy); // Prevent adding creator again
+
+        for (const member of options.members) {
+          // Validate member data
+          if (!member.userId) {
+            console.warn('Skipping member with no userId:', member);
+            continue;
+          }
+
+          if (!member.roleName) {
+            console.warn(`Skipping member ${member.userId} with no roleName`);
+            continue;
+          }
+
+          // Skip if already added (creator)
+          if (member.userId === options.createdBy) {
+            continue;
+          }
+
+          // Check for duplicates
+          if (uniqueUserIds.has(member.userId)) {
+            throw new ApiError(400, `Duplicate member: ${member.userId}`);
+          }
+          uniqueUserIds.add(member.userId);
+
+          // Get role
+          const role = roleMap.get(member.roleName);
+          if (!role) {
+            throw new ApiError(400, `Role "${member.roleName}" not found. Available roles: ${Array.from(roleMap.keys()).join(', ')}`);
+          }
+
+          const isProjectAdmin = member.roleName === "project_admin";
+
+          await tx.insert(projectUsers).values({
+            projectId: project.id,
+            userId: member.userId,
+            roleId: role.id,
+            readAccess: true,
+            writeAccess: isProjectAdmin,
+            updateAccess: isProjectAdmin,
+            deleteAccess: isProjectAdmin,
+          });
+
+          // ========== SEND EMAIL FOR EACH MEMBER ADDED DURING PROJECT CREATION ==========
+          const { emailNotificationService } = await import("../../services/email.service");
+          
+          // Get user details for email
+          const targetUser = await tx.query.users.findFirst({
+            where: eq(users.id, member.userId),
+          });
+          
+          if (targetUser?.email) {
+            await emailNotificationService.sendProjectInviteEmail(
+              project.id,
+              member.userId,
+              project.title,
+              member.roleName,
+              `System (Project Creator)`
+            );
+          }
+          // =============================================================================
+        }
+      }
+
+      return project;
+    });
+  }
 
   // LIST PROJECTS
 
@@ -351,6 +373,23 @@ async createProject(options: {
             eq(projectUsers.userId, targetUserId)
           )
         );
+
+      // ========== SEND EMAIL FOR ROLE UPDATE ==========
+      const projectData = await db.query.projects.findFirst({
+        where: eq(projects.id, projectId)
+      });
+
+      const { emailNotificationService } = await import("../../services/email.service");
+
+      await emailNotificationService.sendProjectInviteEmail(
+        projectId,
+        targetUserId,
+        projectData?.title || 'Project',
+        roleName,
+        `${user.firstName || user.id} ${user.lastName || ''}`
+      );
+      // ================================================
+
       return true;
     }
 
@@ -363,6 +402,22 @@ async createProject(options: {
       updateAccess: false,
       deleteAccess: false,
     });
+
+    // ========== SEND EMAIL FOR NEW INVITATION ==========
+    const projectData = await db.query.projects.findFirst({
+      where: eq(projects.id, projectId)
+    });
+
+    const { emailNotificationService } = await import("../../services/email.service");
+
+    await emailNotificationService.sendProjectInviteEmail(
+      projectId,
+      targetUserId,
+      projectData?.title || 'Project',
+      roleName,
+      `${user.firstName || user.id} ${user.lastName || ''}`
+    );
+    // ====================================================
 
     return true;
   }
