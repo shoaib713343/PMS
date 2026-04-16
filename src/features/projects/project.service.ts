@@ -8,6 +8,7 @@ import { getProjectContext } from "../../utils/getProjectContext";
 import { canAccessProject } from "../../utils/projectAccess";
 import { hasPermission } from "../../utils/permission";
 import { ACTIONS } from "../../constants/actions";
+import { notificationService } from "../../services/notification.service";
 
 type AuthUser = {
   id: number;
@@ -328,99 +329,140 @@ class ProjectService {
     targetUserId: number,
     roleName: string,
     user: AuthUser
-  ) {
+) {
 
     const { project, projectRole } = await getProjectContext(user, projectId);
 
     if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
-      throw new ApiError(403, "No access");
+        throw new ApiError(403, "No access");
     }
 
     if (!hasPermission({
-      user,
-      action: ACTIONS.INVITE_MEMBER,
-      project,
-      projectRole
+        user,
+        action: ACTIONS.INVITE_MEMBER,
+        project,
+        projectRole
     })) {
-      throw new ApiError(403, "Not allowed");
+        throw new ApiError(403, "Not allowed");
     }
 
     const [role] = await db
-      .select()
-      .from(roles)
-      .where(eq(roles.name, roleName));
+        .select()
+        .from(roles)
+        .where(eq(roles.name, roleName));
 
     if (!role) {
-      throw new ApiError(400, "Role not found");
+        throw new ApiError(400, "Role not found");
     }
 
-    const existing = await db
-      .select()
-      .from(projectUsers)
-      .where(
-        and(
-          eq(projectUsers.projectId, projectId),
-          eq(projectUsers.userId, targetUserId)
-        )
-      );
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const projectUrl = `${frontendUrl}/projects/${projectId}`;
 
-    if (existing.length) {
-      await db.update(projectUsers)
-        .set({ roleId: role.id })
+    const existing = await db
+        .select()
+        .from(projectUsers)
         .where(
-          and(
-            eq(projectUsers.projectId, projectId),
-            eq(projectUsers.userId, targetUserId)
-          )
+            and(
+                eq(projectUsers.projectId, projectId),
+                eq(projectUsers.userId, targetUserId)
+            )
         );
 
-      // ========== SEND EMAIL FOR ROLE UPDATE ==========
-      const projectData = await db.query.projects.findFirst({
+    if (existing.length) {
+        await db.update(projectUsers)
+            .set({ roleId: role.id })
+            .where(
+                and(
+                    eq(projectUsers.projectId, projectId),
+                    eq(projectUsers.userId, targetUserId)
+                )
+            );
+
+        // ========== SEND NOTIFICATIONS FOR ROLE UPDATE ==========
+        const projectData = await db.query.projects.findFirst({
+            where: eq(projects.id, projectId)
+        });
+
+        const { emailNotificationService } = await import("../../services/email.service");
+        const { notificationService } = await import("../../services/notification.service");
+
+        // Send Email
+        await emailNotificationService.sendProjectInviteEmail(
+            projectId,
+            targetUserId,
+            projectData?.title || 'Project',
+            roleName,
+            `${user.firstName || user.id} ${user.lastName || ''}`
+        );
+
+        // Send In-App Notification
+        await notificationService.createNotification({
+            userId: targetUserId,
+            type: 'project_invite',
+            title: 'Project Role Updated',
+            message: `Your role in "${projectData?.title}" has been updated to ${roleName}`,
+            entityType: 'project',
+            entityId: projectId,
+            actionUrl: projectUrl,
+            metadata: { 
+                projectName: projectData?.title, 
+                role: roleName, 
+                updatedBy: user.id,
+                updatedByName: `${user.firstName || ''} ${user.lastName || ''}`.trim()
+            }
+        });
+        // ========================================================
+
+        return true;
+    }
+
+    await db.insert(projectUsers).values({
+        projectId,
+        userId: targetUserId,
+        roleId: role.id,
+        readAccess: true,
+        writeAccess: false,
+        updateAccess: false,
+        deleteAccess: false,
+    });
+
+    // ========== SEND NOTIFICATIONS FOR NEW INVITATION ==========
+    const projectData = await db.query.projects.findFirst({
         where: eq(projects.id, projectId)
-      });
+    });
 
-      const { emailNotificationService } = await import("../../services/email.service");
+    const { emailNotificationService } = await import("../../services/email.service");
+    const { notificationService } = await import("../../services/notification.service");
 
-      await emailNotificationService.sendProjectInviteEmail(
+    // Send Email
+    await emailNotificationService.sendProjectInviteEmail(
         projectId,
         targetUserId,
         projectData?.title || 'Project',
         roleName,
         `${user.firstName || user.id} ${user.lastName || ''}`
-      );
-      // ================================================
-
-      return true;
-    }
-
-    await db.insert(projectUsers).values({
-      projectId,
-      userId: targetUserId,
-      roleId: role.id,
-      readAccess: true,
-      writeAccess: false,
-      updateAccess: false,
-      deleteAccess: false,
-    });
-
-    // ========== SEND EMAIL FOR NEW INVITATION ==========
-    const projectData = await db.query.projects.findFirst({
-      where: eq(projects.id, projectId)
-    });
-
-    const { emailNotificationService } = await import("../../services/email.service");
-
-    await emailNotificationService.sendProjectInviteEmail(
-      projectId,
-      targetUserId,
-      projectData?.title || 'Project',
-      roleName,
-      `${user.firstName || user.id} ${user.lastName || ''}`
     );
-    // ====================================================
+
+    // Send In-App Notification
+    await notificationService.createNotification({
+        userId: targetUserId,
+        type: 'project_invite',
+        title: 'Project Invitation',
+        message: `You've been invited to join "${projectData?.title}" as ${roleName}`,
+        entityType: 'project',
+        entityId: projectId,
+        actionUrl: projectUrl,
+        metadata: { 
+            projectName: projectData?.title, 
+            role: roleName, 
+            invitedBy: user.id,
+            invitedByName: `${user.firstName || ''} ${user.lastName || ''}`.trim()
+        }
+    });
+    // ============================================================
 
     return true;
-  }
+}
 
   // REMOVE MEMBER
   async removeProjectMember(

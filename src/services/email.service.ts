@@ -64,7 +64,7 @@ export class EmailNotificationService {
         if(!user?.email) return;
 
         const {emailTemplates} = await import("../config/email");
-        const template = emailTemplates.projectInvite(projectName, role, invitedByName, projectUrl);
+        const template = emailTemplates.projectInvite(projectName, role, projectUrl, invitedByName);
 
         await sendEmailWithLogging(
             user.email,
@@ -95,7 +95,12 @@ export class EmailNotificationService {
       template.html,
       'new_message'
     );
-  }
+    }
+
+     async sendEmailNotification(to: string, subject: string, html: string, type: string) {
+        const { sendEmailWithLogging } = await import("../config/email");
+        return await sendEmailWithLogging(to, subject, html, type);
+    }
 }
 
 export const emailNotificationService = new EmailNotificationService();

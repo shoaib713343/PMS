@@ -17,6 +17,8 @@ import { logActivity } from "../activity/activity.service";
 
 type AuthUser = {
   id: number;
+  firstName: string;
+  lastName: string;
   systemRole: "admin" | "user" | "super_admin";
 };
 
@@ -29,84 +31,106 @@ class TaskService {
 
     // If only threadId is provided, derive projectId from thread
     if (!projectId && threadId) {
-      const thread = await db.query.projectThreads.findFirst({
-        where: eq(projectThreads.id, threadId),
-      });
+        const thread = await db.query.projectThreads.findFirst({
+            where: eq(projectThreads.id, threadId),
+        });
 
-      if (!thread || thread.isDeleted) {
-        throw new ApiError(404, "Thread not found");
-      }
-      projectId = thread.projectId;
+        if (!thread || thread.isDeleted) {
+            throw new ApiError(404, "Thread not found");
+        }
+        projectId = thread.projectId;
     }
 
     if (!projectId) {
-      throw new ApiError(400, "Either projectId or threadId is required");
+        throw new ApiError(400, "Either projectId or threadId is required");
     }
 
     // Get project context for access check
     const { project, projectRole } = await getProjectContext(user, projectId);
 
     if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
-      throw new ApiError(403, "No access");
+        throw new ApiError(403, "No access");
     }
 
     if (!hasPermission({
-      user,
-      action: ACTIONS.CREATE_TASK,
-      project,
-      projectRole
+        user,
+        action: ACTIONS.CREATE_TASK,
+        project,
+        projectRole
     })) {
-      throw new ApiError(403, "Not allowed to create task");
+        throw new ApiError(403, "Not allowed to create task");
     }
 
     return db.transaction(async (tx) => {
-      const [task] = await tx.insert(tasks).values({
-        projectId: projectId,  // Required now
-        threadId: threadId || null,  // Optional, can be null
-        title: options.title,
-        description: options.description,
-        gitLink: options.gitLink,
-        targetDate: options.targetDate,
-        createdUser: user.id,
-      }).returning();
+        const [task] = await tx.insert(tasks).values({
+            projectId: projectId,
+            threadId: threadId || null,
+            title: options.title,
+            description: options.description,
+            gitLink: options.gitLink,
+            targetDate: options.targetDate,
+            createdUser: user.id,
+        }).returning();
 
-      if (options.assignedUserIds?.length) {
-        await tx.insert(taskAssignees).values(
-          options.assignedUserIds.map((uId: number) => ({
-            taskId: task.id,
-            userId: uId,
-          }))
-        );
+        if (options.assignedUserIds?.length) {
+            await tx.insert(taskAssignees).values(
+                options.assignedUserIds.map((uId: number) => ({
+                    taskId: task.id,
+                    userId: uId,
+                }))
+            );
 
-        const project = await tx.query.projects.findFirst({
-          where: eq(projects.id, projectId),
-        });
+            const projectData = await tx.query.projects.findFirst({
+                where: eq(projects.id, projectId),
+            });
 
-        const {emailNotificationService} = await import("../../services/email.service");
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+            const taskUrl = `${frontendUrl}/tasks/${task.id}`;
 
-        for(const assignedUserId of options.assignedUserIds){
-          await emailNotificationService.sendTaskAssignmentEmail(
-            task.id,
-            assignedUserId,
-            options.title,
-            project?.title || "Project"
-          );
+            // Import services
+            const { emailNotificationService } = await import("../../services/email.service");
+            const { notificationService } = await import("../../services/notification.service");
+
+            for (const assignedUserId of options.assignedUserIds) {
+                // 1. Send Email Notification
+                await emailNotificationService.sendTaskAssignmentEmail(
+                    task.id,
+                    assignedUserId,
+                    options.title,
+                    projectData?.title || "Project"
+                );
+
+                // 2. Create In-App Notification
+                await notificationService.createNotification({
+                    userId: assignedUserId,
+                    type: 'task_assigned',
+                    title: 'New Task Assigned',
+                    message: `You have been assigned: ${options.title}`,
+                    entityType: 'task',
+                    entityId: task.id,
+                    actionUrl: taskUrl,
+                    metadata: { 
+                        taskTitle: options.title, 
+                        projectId: projectId,
+                        projectName: projectData?.title,
+                        assignedBy: user.id,
+                        assignedByName: `${user.firstName || ''} ${user.lastName || ''}`.trim()
+                    }
+                });
+            }
         }
 
+        await logActivity({
+            userId: user.id,
+            action: "TASK_CREATED",
+            entity: "TASK",
+            entityId: task.id,
+            projectId: projectId,
+        });
 
-      }
-
-      await logActivity({
-        userId: user.id,
-        action: "TASK_CREATED",
-        entity: "TASK",
-        entityId: task.id,
-        projectId: projectId,
-      });
-
-      return task;
+        return task;
     });
-  }
+}
 
   // GET TASKS FOR USER - FIXED for new structure
   async getTasksForUser(
@@ -407,14 +431,14 @@ async getProjectTasksService(
     taskId: number,
     status: string,
     user: AuthUser
-  ) {
+) {
     // Get task
     const task = await db.query.tasks.findFirst({
-      where: eq(tasks.id, taskId),
+        where: eq(tasks.id, taskId),
     });
 
     if (!task || task.isDeleted) {
-      throw new ApiError(404, "Task not found");
+        throw new ApiError(404, "Task not found");
     }
 
     // Project context using projectId directly
@@ -422,53 +446,90 @@ async getProjectTasksService(
 
     // Access check
     if (!canAccessProject(user, { ...project, createdBy: project.createdBy! }, projectRole)) {
-      throw new ApiError(403, "No access");
+        throw new ApiError(403, "No access");
     }
 
     // Permission check
     if (!hasPermission({
-      user,
-      action: ACTIONS.UPDATE_TASK,
-      project,
-      projectRole,
-      resource: task
+        user,
+        action: ACTIONS.UPDATE_TASK,
+        project,
+        projectRole,
+        resource: task
     })) {
-      throw new ApiError(403, "Not allowed to update task status");
+        throw new ApiError(403, "Not allowed to update task status");
     }
 
     const oldStatus = task.taskStatus;
 
     // Update status
     const [updated] = await db.update(tasks)
-      .set({
-        taskStatus: status,
-        updatedAt: new Date()
-      })
-      .where(eq(tasks.id, taskId))
-      .returning();
+        .set({
+            taskStatus: status,
+            updatedAt: new Date()
+        })
+        .where(eq(tasks.id, taskId))
+        .returning();
 
+    // ========== SEND NOTIFICATIONS TO ASSIGNEES ==========
     const assignees = await db.select()
-      .from(taskAssignees)
-      .where(eq(taskAssignees.taskId, taskId));
+        .from(taskAssignees)
+        .where(eq(taskAssignees.taskId, taskId));
 
-    const {emailNotificationService} = await import("../../services/email.service");
+    if (assignees.length > 0) {
+        // Get project details for notifications
+        const projectData = await db.query.projects.findFirst({
+            where: eq(projects.id, task.projectId),
+        });
 
-    for(const assignee of assignees){
-      if(assignee.userId !== user.id){
-        await emailNotificationService.sendTaskStatusChangedEmail(
-          taskId,
-          assignee.userId,
-          task.title,
-          oldStatus || 'unknown',
-          status
-        )
-      }
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+        const taskUrl = `${frontendUrl}/tasks/${taskId}`;
+
+        const updaterName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || `User ${user.id}`;
+
+        // Import services
+        const { emailNotificationService } = await import("../../services/email.service");
+        const { notificationService } = await import("../../services/notification.service");
+
+        for (const assignee of assignees) {
+            if (assignee.userId !== user.id) {
+                // 1. Send Email Notification
+                await emailNotificationService.sendTaskStatusChangedEmail(
+                    taskId,
+                    assignee.userId,
+                    task.title,
+                    oldStatus || 'unknown',
+                    status
+                );
+
+                // 2. Send In-App Notification
+                await notificationService.createNotification({
+                    userId: assignee.userId,
+                    type: 'task_status_changed',
+                    title: 'Task Status Updated',
+                    message: `Task "${task.title}" status changed from ${oldStatus} to ${status}`,
+                    entityType: 'task',
+                    entityId: taskId,
+                    actionUrl: taskUrl,
+                    metadata: {
+                        taskId: taskId,
+                        taskTitle: task.title,
+                        oldStatus: oldStatus,
+                        newStatus: status,
+                        projectId: task.projectId,
+                        projectName: projectData?.title,
+                        updatedBy: user.id,
+                        updatedByName: updaterName,
+                        updatedAt: new Date().toISOString()
+                    }
+                });
+            }
+        }
     }
-
-
+    // ====================================================
 
     return updated;
-  }
+}
   
   // DELETE TASK - FIXED
   async deleteTask(taskId: number, user: AuthUser) {
