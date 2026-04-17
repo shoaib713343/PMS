@@ -46,6 +46,12 @@ export async function assignServiceToUserController(req: Request, res: Response)
   return res.status(200).json(new ApiResponse(200, "Service assigned to user", assignment));
 }
 
+export async function getProjectServersController(req: Request, res: Response) {
+  const { projectId } = req.params;
+  const servers = await serverService.getProjectServers(Number(projectId));
+  return res.status(200).json(new ApiResponse(200, "Project servers fetched", servers));
+}
+
 // Server controllers
 export async function updateServerController(req: Request, res: Response) {
   const server = await serverService.updateServer(
@@ -83,4 +89,10 @@ export async function removeServiceFromUserController(req: Request, res: Respons
     req.user!
   );
   return res.status(200).json(new ApiResponse(200, "Service removed from user", null));
+}
+
+export async function getUserServicesController(req: Request, res: Response) {
+  const { userId } = req.params;
+  const services = await serviceManagementService.getUserServices(Number(userId));
+  return res.status(200).json(new ApiResponse(200, "User services fetched", services));
 }

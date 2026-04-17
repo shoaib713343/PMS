@@ -2,7 +2,7 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "../../db";
 
 import { projectThreads } from "../../db/schema/projectThreads";
-import { projects, tasks } from "../../db/schema";
+import { projects, projectUsers, tasks } from "../../db/schema";
 
 import { ApiError } from "../../utils/ApiError";
 
@@ -83,18 +83,20 @@ class ThreadService {
 
     // user → only project member threads
     return db.select({
-      id: projectThreads.id,
-      topic: projectThreads.topic,
-      projectId: projectThreads.projectId,
-      projectName: projects.title,
-    })
-    .from(projectThreads)
-    .leftJoin(projects, eq(projectThreads.projectId, projects.id))
-    .leftJoin(
-      projectThreads,
-      eq(projectThreads.projectId, projectThreads.projectId)
-    )
-    .where(eq(projectThreads.isDeleted, false));
+  id: projectThreads.id,
+  topic: projectThreads.topic,
+  projectId: projectThreads.projectId,
+  projectName: projects.title,
+})
+.from(projectThreads)
+.leftJoin(projects, eq(projectThreads.projectId, projects.id))
+.innerJoin(projectUsers, eq(projects.id, projectUsers.projectId))  // ← Fixed
+.where(
+  and(
+    eq(projectThreads.isDeleted, false),
+    eq(projectUsers.userId, user.id)  // ← Only threads from projects user belongs to
+  )
+);
   }
 
   // GET THREADS BY PROJECT
