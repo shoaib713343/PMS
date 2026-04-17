@@ -16,6 +16,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@jest/globals": "^30.3.0",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
     "@types/multer": "^2.1.0",
