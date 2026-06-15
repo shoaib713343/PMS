@@ -6,6 +6,7 @@ import { ApiError } from "../../utils/ApiError";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { userSessions } from "../../db/schema";
+import { env } from "../../config/env";
 
 
 type Register = {
@@ -96,7 +97,13 @@ class AuthService{
             systemRole: user.systemRole
         };
         
-        const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, {expiresIn: process.env.JWT_EXPIRY!});
+        const accessToken = jwt.sign(
+  payload,
+  env.JWT_SECRET,
+  {
+    expiresIn: env.JWT_EXPIRY as any,
+  }
+);
 
         // BACKWARD COMPATIBLE: Return user with 'name' field
         return {
@@ -164,9 +171,13 @@ class AuthService{
             systemRole: user.systemRole
         };
 
-        const accessToken = jwt.sign(payload, process.env.JWT_SECRET!, {
-            expiresIn: process.env.JWT_EXPIRY!
-        });
+        const accessToken = jwt.sign(
+  payload,
+  env.JWT_SECRET,
+  {
+    expiresIn: env.JWT_EXPIRY as any,
+  }
+);
 
         return {
             accessToken,

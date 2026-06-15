@@ -7,11 +7,13 @@ type AuthUser = {
   systemRole: "user" | "admin" | "super_admin";
 };
 
+type Project = {
+  id: number;
+  createdBy: number | null;
+};
+
 type ProjectContext = {
-  project: {
-    id: number;
-    createdBy: number | null;
-  };
+  project: Project;
   projectRole: string | null;
 };
 
@@ -25,7 +27,8 @@ export async function getProjectContext(
       id: true,
       createdBy: true,
     },
-    where: (p, { eq }) => eq(p.id, projectId),
+    // cast to any to avoid duplicate-drizzle typing mismatch between packages
+    where: ((p: { id: any; }, { eq }: any) => eq(p.id, projectId)) as any,
   });
 
   if (!project) {
