@@ -79,9 +79,6 @@ app.use("/api/v1/deployment", deploymentRouter);
 // NOTIFICATION ROUTES
 app.use("/api/v1/notifications", notificationRouter);
 
-import activityRoutes from "./features/activity/activity.routes";
-
-app.use("/api/v1/activity", activityRoutes);
 
 // Error handler (must be last)
 app.use(errorHandler);
