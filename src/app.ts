@@ -21,7 +21,7 @@ const app = express();
 
 app.use(express.json());
 app.use(cors({
-  origin: ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174"],
+  origin: ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://dev.ingreens.in", "https://ingreens.in"],
   credentials: true,
 }));
 app.use(cookieParser());
